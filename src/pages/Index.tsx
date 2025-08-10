@@ -3,73 +3,79 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { 
   Thermometer, 
   Droplets, 
   Gauge, 
   Cloud, 
-  Plus, 
   Settings,
   BarChart3,
   Grid3X3,
   Wifi,
-  WifiOff
+  WifiOff,
+  LogOut
 } from "lucide-react";
 import MetricCard from "@/components/MetricCard";
 import DeviceCard from "@/components/DeviceCard";
 import ChartView from "@/components/ChartView";
+import AddDeviceDialog from "@/components/AddDeviceDialog";
 import Header from "@/components/Header";
-
-// Mock data for demonstration
-const mockDevices = [
-  {
-    id: "1",
-    name: "Living Room Sensor",
-    deviceId: "ESP32_LR_001",
-    lastReading: new Date(),
-    isOnline: true,
-    temperature: 23.5,
-    humidity: 45.2,
-    pressure: 1013.2,
-    dewPoint: 11.2
-  },
-  {
-    id: "2", 
-    name: "Greenhouse Monitor",
-    deviceId: "ESP32_GH_002",
-    lastReading: new Date(Date.now() - 3600000), // 1 hour ago
-    isOnline: true,
-    temperature: 28.1,
-    humidity: 72.8,
-    pressure: 1012.8,
-    dewPoint: 22.9
-  },
-  {
-    id: "3",
-    name: "Basement Sensor",
-    deviceId: "ESP32_BS_003", 
-    lastReading: new Date(Date.now() - 7200000), // 2 hours ago
-    isOnline: false,
-    temperature: 18.3,
-    humidity: 65.1,
-    pressure: 1014.1,
-    dewPoint: 12.1
-  }
-];
+import { useDevices } from "@/hooks/useDevices";
+import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
   const [activeView, setActiveView] = useState<'grid' | 'chart'>('grid');
   const [selectedDevice, setSelectedDevice] = useState<string>('all');
+  const { data: devices = [], isLoading } = useDevices();
+  const { signOut } = useAuth();
 
-  const averageMetrics = {
-    temperature: mockDevices.reduce((sum, device) => sum + device.temperature, 0) / mockDevices.length,
-    humidity: mockDevices.reduce((sum, device) => sum + device.humidity, 0) / mockDevices.length,
-    pressure: mockDevices.reduce((sum, device) => sum + device.pressure, 0) / mockDevices.length,
-    dewPoint: mockDevices.reduce((sum, device) => sum + device.dewPoint, 0) / mockDevices.length,
+  // Calculate average metrics from all devices
+  const averageMetrics = devices.length > 0 ? {
+    temperature: devices
+      .filter(device => device.latest_reading)
+      .reduce((sum, device) => sum + (device.latest_reading?.temperature || 0), 0) / 
+      devices.filter(device => device.latest_reading).length,
+    humidity: devices
+      .filter(device => device.latest_reading)
+      .reduce((sum, device) => sum + (device.latest_reading?.humidity || 0), 0) / 
+      devices.filter(device => device.latest_reading).length,
+    pressure: devices
+      .filter(device => device.latest_reading)
+      .reduce((sum, device) => sum + (device.latest_reading?.pressure || 0), 0) / 
+      devices.filter(device => device.latest_reading).length,
+    dewPoint: devices
+      .filter(device => device.latest_reading)
+      .reduce((sum, device) => sum + (device.latest_reading?.dew_point || 0), 0) / 
+      devices.filter(device => device.latest_reading).length,
+  } : {
+    temperature: 0,
+    humidity: 0,
+    pressure: 0,
+    dewPoint: 0,
   };
 
-  const onlineDevices = mockDevices.filter(device => device.isOnline).length;
+  const onlineDevices = devices.filter(device => {
+    if (!device.latest_reading) return false;
+    const lastReading = new Date(device.latest_reading.timestamp);
+    const now = new Date();
+    const hoursDiff = (now.getTime() - lastReading.getTime()) / (1000 * 60 * 60);
+    return hoursDiff <= 2; // Consider online if last reading was within 2 hours
+  }).length;
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-dashboard-bg flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading devices...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-dashboard-bg">
@@ -84,7 +90,7 @@ const Index = () => {
             unit="°C"
             icon={Thermometer}
             gradient="temp-gradient"
-            trend="+0.5°C"
+            trend={devices.length > 0 ? "+0.5°C" : "No data"}
           />
           <MetricCard
             title="Humidity"
@@ -92,7 +98,7 @@ const Index = () => {
             unit="%"
             icon={Droplets}
             gradient="humidity-gradient"
-            trend="-2.1%"
+            trend={devices.length > 0 ? "-2.1%" : "No data"}
           />
           <MetricCard
             title="Pressure"
@@ -100,7 +106,7 @@ const Index = () => {
             unit="hPa"
             icon={Gauge}
             gradient="pressure-gradient"
-            trend="+1.2 hPa"
+            trend={devices.length > 0 ? "+1.2 hPa" : "No data"}
           />
           <MetricCard
             title="Dew Point"
@@ -108,7 +114,7 @@ const Index = () => {
             unit="°C"
             icon={Cloud}
             gradient="dewpoint-gradient"
-            trend="+0.3°C"
+            trend={devices.length > 0 ? "+0.3°C" : "No data"}
           />
         </div>
 
@@ -122,16 +128,16 @@ const Index = () => {
               </div>
               <div className="flex items-center gap-2">
                 <WifiOff className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm font-medium">{mockDevices.length - onlineDevices} Offline</span>
+                <span className="text-sm font-medium">{devices.length - onlineDevices} Offline</span>
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Device
-              </Button>
+              <AddDeviceDialog />
               <Button variant="outline" size="sm">
                 <Settings className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -157,12 +163,19 @@ const Index = () => {
         {/* Main Content */}
         {activeView === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mockDevices.map((device) => (
-              <DeviceCard key={device.id} device={device} />
-            ))}
+            {devices.length > 0 ? (
+              devices.map((device) => (
+                <DeviceCard key={device.id} device={device} />
+              ))
+            ) : (
+              <div className="col-span-full text-center py-12">
+                <p className="text-muted-foreground mb-4">No devices found. Add your first device to get started!</p>
+                <AddDeviceDialog />
+              </div>
+            )}
           </div>
         ) : (
-          <ChartView devices={mockDevices} selectedDevice={selectedDevice} />
+          <ChartView devices={devices} selectedDevice={selectedDevice} />
         )}
       </main>
     </div>

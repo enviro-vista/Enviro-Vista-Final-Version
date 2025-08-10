@@ -14,7 +14,106 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      devices: {
+        Row: {
+          created_at: string | null
+          device_id: string
+          id: string
+          name: string
+          owner_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          device_id: string
+          id?: string
+          name: string
+          owner_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          device_id?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devices_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          id: string
+          name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      readings: {
+        Row: {
+          created_at: string | null
+          device_id: string
+          dew_point: number
+          humidity: number
+          id: string
+          pressure: number
+          temperature: number
+          timestamp: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          device_id: string
+          dew_point: number
+          humidity: number
+          id?: string
+          pressure: number
+          temperature: number
+          timestamp?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          device_id?: string
+          dew_point?: number
+          humidity?: number
+          id?: string
+          pressure?: number
+          temperature?: number
+          timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "readings_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
