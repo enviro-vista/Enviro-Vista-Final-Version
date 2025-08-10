@@ -54,9 +54,11 @@ export const useAddDevice = () => {
 
   return useMutation({
     mutationFn: async ({ device_id, name }: { device_id: string; name: string }) => {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) throw userError || new Error('Not authenticated');
       const { data, error } = await supabase
         .from('devices')
-        .insert([{ device_id, name }])
+        .insert([{ device_id, name, owner_id: userData.user.id }])
         .select()
         .single();
 
