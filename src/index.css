@@ -1,96 +1,75 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Climate Pulse Suite Design System - IoT Environmental Monitoring */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Base colors */
+    --background: 210 20% 98%;
+    --foreground: 210 40% 12%;
 
+    /* Primary - Climate Blue */
+    --primary: 200 95% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Fresh Green */
+    --secondary: 140 70% 95%;
+    --secondary-foreground: 140 70% 15%;
+
+    /* Accent - Ocean Teal */
+    --accent: 180 85% 90%;
+    --accent-foreground: 180 85% 15%;
+
+    /* Climate-specific colors */
+    --temperature: 15 85% 55%;
+    --humidity: 200 85% 60%;
+    --pressure: 270 75% 65%;
+    --dewpoint: 160 80% 50%;
+
+    /* UI colors */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 12%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 210 20% 45%;
+    --border: 210 40% 88%;
+    --input: 210 40% 88%;
+    --ring: 200 95% 45%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    /* Status colors */
+    --success: 140 70% 50%;
+    --warning: 45 90% 55%;
+    --destructive: 0 75% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Dashboard specific */
+    --dashboard-bg: 210 30% 96%;
+    --card-hover: 0 0% 98%;
+    --metric-bg: linear-gradient(135deg, hsl(200 100% 98%) 0%, hsl(180 100% 98%) 100%);
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --radius: 0.75rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --background: 210 50% 8%;
+    --foreground: 210 40% 95%;
+    --primary: 200 95% 55%;
+    --primary-foreground: 210 50% 8%;
+    --secondary: 140 30% 15%;
+    --secondary-foreground: 140 70% 85%;
+    --accent: 180 50% 20%;
+    --accent-foreground: 180 85% 85%;
+    --card: 210 50% 10%;
+    --card-foreground: 210 40% 95%;
+    --muted: 210 40% 15%;
+    --muted-foreground: 210 20% 65%;
+    --border: 210 40% 20%;
+    --input: 210 40% 20%;
+    --dashboard-bg: 210 50% 6%;
+    --card-hover: 210 50% 12%;
+    --metric-bg: linear-gradient(135deg, hsl(200 50% 12%) 0%, hsl(180 50% 12%) 100%);
   }
 }
 
@@ -100,6 +79,105 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary/30 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/50;
+  }
+}
+
+@layer components {
+  /* Glassmorphism effect for cards */
+  .glass-card {
+    @apply backdrop-blur-sm bg-card/80 border border-border/50;
+  }
+
+  /* Metric cards */
+  .metric-card {
+    @apply relative overflow-hidden rounded-xl p-6;
+    background: var(--metric-bg);
+    border: 1px solid hsl(var(--border) / 0.5);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .metric-card:hover {
+    @apply scale-[1.02] shadow-lg;
+    background: var(--card-hover);
+  }
+
+  /* Data visualization */
+  .chart-container {
+    @apply w-full h-64 p-4 rounded-lg bg-card border;
+  }
+
+  /* Status indicators */
+  .status-online {
+    @apply bg-success/20 text-success border-success/30;
+  }
+
+  .status-offline {
+    @apply bg-muted text-muted-foreground border-border;
+  }
+
+  /* Climate-specific metric colors */
+  .temp-gradient {
+    background: linear-gradient(135deg, hsl(15 85% 55%) 0%, hsl(25 85% 60%) 100%);
+  }
+
+  .humidity-gradient {
+    background: linear-gradient(135deg, hsl(200 85% 60%) 0%, hsl(220 85% 65%) 100%);
+  }
+
+  .pressure-gradient {
+    background: linear-gradient(135deg, hsl(270 75% 65%) 0%, hsl(290 75% 70%) 100%);
+  }
+
+  .dewpoint-gradient {
+    background: linear-gradient(135deg, hsl(160 80% 50%) 0%, hsl(180 80% 55%) 100%);
+  }
+}
+
+@layer utilities {
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out forwards;
+  }
+
+  .animate-pulse-soft {
+    animation: pulseSoft 2s ease-in-out infinite;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulseSoft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
   }
 }
