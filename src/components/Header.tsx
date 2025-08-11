@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +42,7 @@ const Header = () => {
             <div className="flex items-center gap-2">
               <CloudRain className="h-8 w-8 text-primary" />
               <div>
-                <h1 className="text-xl font-bold tracking-tight">Climate Pulse</h1>
+                <h1 className="text-xl font-bold tracking-tight">Enviro-Vista</h1>
                 <p className="text-xs text-muted-foreground">Environmental Monitoring</p>
               </div>
             </div>

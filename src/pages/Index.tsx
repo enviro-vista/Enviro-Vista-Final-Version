@@ -22,12 +22,25 @@ import AddDeviceDialog from "@/components/AddDeviceDialog";
 import Header from "@/components/Header";
 import { useDevices } from "@/hooks/useDevices";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [activeView, setActiveView] = useState<'grid' | 'chart'>('grid');
   const [selectedDevice, setSelectedDevice] = useState<string>('all');
   const { data: devices = [], isLoading } = useDevices();
   const { signOut } = useAuth();
+  const [liveMonitoring, setLiveMonitoring] = useState<boolean>(() => JSON.parse(localStorage.getItem("settings.liveMonitoring") ?? "true"));
+  const [alertsEnabled, setAlertsEnabled] = useState<boolean>(() => JSON.parse(localStorage.getItem("settings.alertsEnabled") ?? "true"));
 
   // Calculate average metrics from all devices
   const averageMetrics = devices.length > 0 ? {
@@ -133,9 +146,50 @@ const Index = () => {
             </div>
             <div className="flex gap-2">
               <AddDeviceDialog />
-              <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4" />
-              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" aria-label="Settings">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Settings</DialogTitle>
+                    <DialogDescription>Configure your dashboard preferences.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Live monitoring</p>
+                        <p className="text-xs text-muted-foreground">Update dashboard in real time.</p>
+                      </div>
+                      <Switch checked={liveMonitoring} onCheckedChange={setLiveMonitoring} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Notifications</p>
+                        <p className="text-xs text-muted-foreground">Enable alert popovers.</p>
+                      </div>
+                      <Switch checked={alertsEnabled} onCheckedChange={setAlertsEnabled} />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      onClick={() => {
+                        try {
+                          localStorage.setItem("settings.liveMonitoring", JSON.stringify(liveMonitoring));
+                          localStorage.setItem("settings.alertsEnabled", JSON.stringify(alertsEnabled));
+                          toast({ title: "Settings saved" });
+                        } catch (e) {
+                          toast({ title: "Could not save settings" });
+                        }
+                      }}
+                    >
+                      Save
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
               <Button variant="outline" size="sm" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4" />
               </Button>
