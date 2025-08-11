@@ -11,14 +11,14 @@ const AddDeviceDialog = () => {
   const [open, setOpen] = useState(false);
   const [deviceId, setDeviceId] = useState('');
   const [name, setName] = useState('');
+  const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const addDevice = useAddDevice();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     try {
-      await addDevice.mutateAsync({ device_id: deviceId, name });
-      setOpen(false);
+      const res: any = await addDevice.mutateAsync({ device_id: deviceId, name });
+      setDeviceToken(res?.token ?? null);
       setDeviceId('');
       setName('');
     } catch (error) {
@@ -36,43 +36,69 @@ const AddDeviceDialog = () => {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Device</DialogTitle>
+          <DialogTitle>{deviceToken ? 'Device Registered' : 'Add New Device'}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="device-id">Device ID</Label>
-            <Input
-              id="device-id"
-              placeholder="ESP32_001"
-              value={deviceId}
-              onChange={(e) => setDeviceId(e.target.value)}
-              required
-            />
+        {!deviceToken ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="device-id">Device ID</Label>
+              <Input
+                id="device-id"
+                placeholder="ESP32_001"
+                value={deviceId}
+                onChange={(e) => setDeviceId(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="device-name">Device Name</Label>
+              <Input
+                id="device-name"
+                placeholder="Living Room Sensor"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addDevice.isPending}>
+                {addDevice.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Add Device
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Copy this device token and paste it into your ESP32 firmware. Store it securely; you won't be able to view it again.
+            </p>
+            <div className="space-y-2">
+              <Label>Device JWT</Label>
+              <Input readOnly value={deviceToken} onFocus={(e) => e.currentTarget.select()} />
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigator.clipboard.writeText(deviceToken)}
+                >
+                  Copy Token
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setDeviceToken(null);
+                    setOpen(false);
+                  }}
+                >
+                  Done
+                </Button>
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="device-name">Device Name</Label>
-            <Input
-              id="device-name"
-              placeholder="Living Room Sensor"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={addDevice.isPending}>
-              {addDevice.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Add Device
-            </Button>
-          </div>
-        </form>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -71,3 +71,86 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+---
+
+## ESP32 Integration (MVP)
+
+Use these steps to send measurements securely to your app.
+
+1) Register your device in the web app to receive a Device JWT.
+
+2) Configure your ESP32 to POST JSON to your ingest endpoint:
+
+- Endpoint URL: https://ihuzpqoevnpwesqagsbv.functions.supabase.co/ingest
+- HTTP Method: POST
+- Headers:
+  - Content-Type: application/json
+  - Authorization: Bearer YOUR_DEVICE_JWT_FROM_WEB_APP
+- Body format:
+```json
+{
+  "device_id": "DEVICE123",
+  "temperature": 25.4,
+  "humidity": 60.2,
+  "pressure": 1013.1
+}
+```
+
+3) Example Arduino HTTP code:
+
+```cpp
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+
+const char* serverName = "https://ihuzpqoevnpwesqagsbv.functions.supabase.co/ingest"; // Supabase Edge Function
+const char* DEVICE_JWT = "YOUR_DEVICE_JWT_FROM_WEB_APP";
+const char* DEVICE_ID = "DEVICE123";
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println(" Connected!");
+}
+
+void loop() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    float temperature = 25.4;
+    float humidity = 60.2;
+    float pressure = 1013.1;
+
+    String payload = "{";
+    payload += "\"device_id\":\"" + String(DEVICE_ID) + "\",";
+    payload += "\"temperature\":" + String(temperature, 1) + ",";
+    payload += "\"humidity\":" + String(humidity, 1) + ",";
+    payload += "\"pressure\":" + String(pressure, 1);
+    payload += "}";
+
+    http.begin(serverName);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", "Bearer " + String(DEVICE_JWT));
+
+    int httpResponseCode = http.POST(payload);
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    http.end();
+  } else {
+    Serial.println("WiFi Disconnected");
+  }
+
+  delay(3600000); // every 1 hour
+}
+```
+
+Notes:
+- Dew point is computed server-side: dew_point = temperature - ((100 - humidity) / 5)
+- The Device JWT is long-lived (10 years) and scoped to your device_id.
+- Never share your SUPABASE_SERVICE_ROLE_KEY. Only store it as a Supabase secret.

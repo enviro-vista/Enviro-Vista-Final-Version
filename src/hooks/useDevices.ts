@@ -56,14 +56,15 @@ export const useAddDevice = () => {
     mutationFn: async ({ device_id, name }: { device_id: string; name: string }) => {
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData.user) throw userError || new Error('Not authenticated');
-      const { data, error } = await supabase
-        .from('devices')
-        .insert([{ device_id, name, owner_id: userData.user.id }])
-        .select()
-        .single();
+      const { data: response, error } = await supabase
+        .functions
+        .invoke('register-device', {
+          body: { device_id, name },
+        });
 
       if (error) throw error;
-      return data;
+      return response;
+
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] });
