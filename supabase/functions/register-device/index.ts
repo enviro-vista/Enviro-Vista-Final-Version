@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { SignJWT } from 'npm:jose@5.6.3';
+import { SignJWT } from 'https://esm.sh/jose@5.6.3'; // ✅ Deno-friendly import
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,7 +8,6 @@ const corsHeaders = {
 };
 
 export const handler = async (req) => {
-  // Handle preflight OPTIONS request quickly
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: { ...corsHeaders } });
   }
