@@ -55,6 +55,7 @@ export type Database = {
           email: string | null
           id: string
           name: string | null
+          subscription_tier: Database["public"]["Enums"]["subscription_tier"]
           updated_at: string | null
         }
         Insert: {
@@ -62,6 +63,7 @@ export type Database = {
           email?: string | null
           id: string
           name?: string | null
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string | null
         }
         Update: {
@@ -69,6 +71,7 @@ export type Database = {
           email?: string | null
           id?: string
           name?: string | null
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string | null
         }
         Relationships: []
@@ -114,15 +117,246 @@ export type Database = {
           },
         ]
       }
+      sensor_readings: {
+        Row: {
+          absolute_humidity: number | null
+          acceleration_x: number | null
+          acceleration_y: number | null
+          acceleration_z: number | null
+          altitude: number | null
+          battery_health: number | null
+          battery_percentage: number | null
+          battery_voltage: number | null
+          co2: number | null
+          created_at: string
+          device_id: string
+          dew_point: number | null
+          heat_index: number | null
+          humidity: number | null
+          id: string
+          light_tsl2591: number | null
+          light_veml7700: number | null
+          par: number | null
+          pressure: number | null
+          shock_detected: boolean | null
+          soil_capacitance: number | null
+          soil_moisture_percentage: number | null
+          temperature: number | null
+          timestamp: string
+          vpd: number | null
+          weather_trend: string | null
+          wet_bulb_temp: number | null
+        }
+        Insert: {
+          absolute_humidity?: number | null
+          acceleration_x?: number | null
+          acceleration_y?: number | null
+          acceleration_z?: number | null
+          altitude?: number | null
+          battery_health?: number | null
+          battery_percentage?: number | null
+          battery_voltage?: number | null
+          co2?: number | null
+          created_at?: string
+          device_id: string
+          dew_point?: number | null
+          heat_index?: number | null
+          humidity?: number | null
+          id?: string
+          light_tsl2591?: number | null
+          light_veml7700?: number | null
+          par?: number | null
+          pressure?: number | null
+          shock_detected?: boolean | null
+          soil_capacitance?: number | null
+          soil_moisture_percentage?: number | null
+          temperature?: number | null
+          timestamp?: string
+          vpd?: number | null
+          weather_trend?: string | null
+          wet_bulb_temp?: number | null
+        }
+        Update: {
+          absolute_humidity?: number | null
+          acceleration_x?: number | null
+          acceleration_y?: number | null
+          acceleration_z?: number | null
+          altitude?: number | null
+          battery_health?: number | null
+          battery_percentage?: number | null
+          battery_voltage?: number | null
+          co2?: number | null
+          created_at?: string
+          device_id?: string
+          dew_point?: number | null
+          heat_index?: number | null
+          humidity?: number | null
+          id?: string
+          light_tsl2591?: number | null
+          light_veml7700?: number | null
+          par?: number | null
+          pressure?: number | null
+          shock_detected?: boolean | null
+          soil_capacitance?: number | null
+          soil_moisture_percentage?: number | null
+          temperature?: number | null
+          timestamp?: string
+          vpd?: number | null
+          weather_trend?: string | null
+          wet_bulb_temp?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sensor_readings_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      sensor_readings_effective: {
+        Row: {
+          absolute_humidity: number | null
+          acceleration_x: number | null
+          acceleration_y: number | null
+          acceleration_z: number | null
+          altitude: number | null
+          battery_health: number | null
+          battery_percentage: number | null
+          battery_voltage: number | null
+          co2: number | null
+          created_at: string | null
+          device_id: string | null
+          dew_point: number | null
+          heat_index: number | null
+          humidity: number | null
+          id: string | null
+          light_tsl2591: number | null
+          light_veml7700: number | null
+          par: number | null
+          pressure: number | null
+          shock_detected: boolean | null
+          soil_capacitance: number | null
+          soil_moisture_percentage: number | null
+          temperature: number | null
+          timestamp: string | null
+          vpd: number | null
+          weather_trend: string | null
+          wet_bulb_temp: number | null
+        }
+        Insert: {
+          absolute_humidity?: never
+          acceleration_x?: never
+          acceleration_y?: never
+          acceleration_z?: never
+          altitude?: never
+          battery_health?: never
+          battery_percentage?: never
+          battery_voltage?: never
+          co2?: never
+          created_at?: string | null
+          device_id?: string | null
+          dew_point?: never
+          heat_index?: never
+          humidity?: number | null
+          id?: string | null
+          light_tsl2591?: never
+          light_veml7700?: never
+          par?: never
+          pressure?: number | null
+          shock_detected?: never
+          soil_capacitance?: never
+          soil_moisture_percentage?: never
+          temperature?: number | null
+          timestamp?: string | null
+          vpd?: never
+          weather_trend?: never
+          wet_bulb_temp?: never
+        }
+        Update: {
+          absolute_humidity?: never
+          acceleration_x?: never
+          acceleration_y?: never
+          acceleration_z?: never
+          altitude?: never
+          battery_health?: never
+          battery_percentage?: never
+          battery_voltage?: never
+          co2?: never
+          created_at?: string | null
+          device_id?: string | null
+          dew_point?: never
+          heat_index?: never
+          humidity?: number | null
+          id?: string | null
+          light_tsl2591?: never
+          light_veml7700?: never
+          par?: never
+          pressure?: number | null
+          shock_detected?: never
+          soil_capacitance?: never
+          soil_moisture_percentage?: never
+          temperature?: number | null
+          timestamp?: string | null
+          vpd?: never
+          weather_trend?: never
+          wet_bulb_temp?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sensor_readings_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_premium: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      subscription_tier: "free" | "premium"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -249,6 +483,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      subscription_tier: ["free", "premium"],
+    },
   },
 } as const
