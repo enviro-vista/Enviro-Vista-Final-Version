@@ -2,9 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SignJWT } from 'npm:jose@5.6.3';
 
 // Use environment variables
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://ihuzpqoevnpwesqagsbv.supabase.co';
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlodXpwcW9ldm5wd2VzcWFnc2J2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4MzYzNzUsImV4cCI6MjA3MDQxMjM3NX0.XoM0YSz7fr1uKbNAf9FooBHb1rIBgjDtL4rGysacGg4';
-const jwtSecret = Deno.env.get('JWT_SECRET') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlodXpwcW9ldm5wd2VzcWFnc2J2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDgzNjM3NSwiZXhwIjoyMDcwNDEyMzc1fQ.paG3HH1oe2FT3FeWVy-fXkZMM5SdtCFcq6f-17y1hRU';
+const supabaseUrl = Deno.env.get('SB_URL') || 'https://ihuzpqoevnpwesqagsbv.supabase.co';
+const supabaseAnonKey = Deno.env.get('SB_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlodXpwcW9ldm5wd2VzcWFnc2J2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4MzYzNzUsImV4cCI6MjA3MDQxMjM3NX0.XoM0YSz7fr1uKbNAf9FooBHb1rIBgjDtL4rGysacGg4';
+const jwtSecret = Deno.env.get('JWT_SECRET') || 't3fYXmyny2Hvf+ZBd4jUp3ixZRySEnNtx7iArRZuCdqtmtBR7KvNLn/4G957qBHDnK1uovHokQITGQF8behvVA==';
 
 // Allowed origins
 const allowedOrigins = [
