@@ -67,10 +67,12 @@ export const useAddDevice = () => {
       }
 
       // Call the Edge Function with explicit Authorization header
+      // CRITICAL FIX: Added Content-Type header to satisfy CORS preflight
       const { data: response, error } = await supabase.functions.invoke('register-device', {
         body: { device_id, name },
         headers: {
           Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json', // Added this header
         },
       });
 
@@ -93,4 +95,3 @@ export const useAddDevice = () => {
     },
   });
 };
-
