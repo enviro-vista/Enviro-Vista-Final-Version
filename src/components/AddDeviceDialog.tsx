@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -17,8 +16,8 @@ const AddDeviceDialog = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res: any = await addDevice.mutateAsync({ device_id: deviceId, name });
-      setDeviceToken(res?.token ?? null);
+      const res = await addDevice.mutateAsync({ device_id: deviceId, name });
+      setDeviceToken(res.token);
       setDeviceId('');
       setName('');
     } catch (error) {
@@ -27,7 +26,12 @@ const AddDeviceDialog = () => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      if (!isOpen) {
+        setDeviceToken(null);
+      }
+      setOpen(isOpen);
+    }}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Plus className="h-4 w-4 mr-2" />
@@ -38,6 +42,7 @@ const AddDeviceDialog = () => {
         <DialogHeader>
           <DialogTitle>{deviceToken ? 'Device Registered' : 'Add New Device'}</DialogTitle>
         </DialogHeader>
+        
         {!deviceToken ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -61,10 +66,17 @@ const AddDeviceDialog = () => {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={addDevice.isPending}>
+              <Button 
+                type="submit" 
+                disabled={addDevice.isPending}
+              >
                 {addDevice.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Add Device
               </Button>
@@ -73,25 +85,27 @@ const AddDeviceDialog = () => {
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Copy this device token and paste it into your ESP32 firmware. Store it securely; you won't be able to view it again.
+              Copy this device token and paste it into your ESP32 firmware. 
+              Store it securely; you won't be able to view it again.
             </p>
             <div className="space-y-2">
               <Label>Device JWT</Label>
-              <Input readOnly value={deviceToken} onFocus={(e) => e.currentTarget.select()} />
+              <Input 
+                readOnly 
+                value={deviceToken} 
+                onFocus={(e) => e.currentTarget.select()} 
+              />
               <div className="flex gap-2 justify-end">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigator.clipboard.writeText(deviceToken)}
+                  onClick={() => navigator.clipboard.writeText(deviceToken || '')}
                 >
                   Copy Token
                 </Button>
                 <Button
                   type="button"
-                  onClick={() => {
-                    setDeviceToken(null);
-                    setOpen(false);
-                  }}
+                  onClick={() => setOpen(false)}
                 >
                   Done
                 </Button>
