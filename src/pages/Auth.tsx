@@ -57,18 +57,6 @@ const Auth = () => {
             />
           )}
         </div>
-        
-        <div className="text-center">
-          <button
-            onClick={toggleMode}
-            disabled={loading}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50"
-          >
-            {isLogin 
-              ? "Don't have an account? Sign up" 
-              : "Already have an account? Sign in"}
-          </button>
-        </div>
       </div>
     </div>
   );
