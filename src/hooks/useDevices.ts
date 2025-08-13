@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -54,17 +53,29 @@ export const useAddDevice = () => {
 
   return useMutation({
     mutationFn: async ({ device_id, name }: { device_id: string; name: string }) => {
+      // Ensure user is authenticated
       const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData.user) throw userError || new Error('Not authenticated');
-      const { data: response, error } = await supabase
-        .functions
-        .invoke('register-device', {
-          body: { device_id, name },
-        });
+      if (userError || !userData.user) {
+        throw userError || new Error('Not authenticated');
+      }
+
+      // Get the access token
+      const session = await supabase.auth.getSession();
+      const accessToken = session.data.session?.access_token;
+      if (!accessToken) {
+        throw new Error('No access token found. Please log in again.');
+      }
+
+      // Call the Edge Function with explicit Authorization header
+      const { data: response, error } = await supabase.functions.invoke('register-device', {
+        body: { device_id, name },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
 
       if (error) throw error;
       return response;
-
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] });
@@ -82,3 +93,4 @@ export const useAddDevice = () => {
     },
   });
 };
+
