@@ -26,8 +26,8 @@ export const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseUrl = Deno.env.get('SB_URL')!;
+    const supabaseKey = Deno.env.get('SB_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -60,7 +60,7 @@ export const handler = async (req: Request): Promise<Response> => {
     // For now, simulate successful payment and upgrade user
     const supabaseAdmin = createClient(
       supabaseUrl,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      Deno.env.get('SB_SERVICE_ROLE_KEY')!
     );
 
     const { error: updateError } = await supabaseAdmin
