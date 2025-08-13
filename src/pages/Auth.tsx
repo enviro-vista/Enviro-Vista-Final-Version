@@ -38,7 +38,7 @@ const Auth = () => {
     <div className="min-h-screen bg-dashboard-bg flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold">Climate Pulse Suite</h1>
+          <h1 className="text-2xl font-bold">Enviro-Vista</h1>
           <p className="text-muted-foreground mt-2">
             {isLogin ? "Sign in to your account" : "Create a new account"}
           </p>
