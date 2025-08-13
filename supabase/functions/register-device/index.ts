@@ -29,7 +29,7 @@ export const handler = async (req) => {
     }
 
     const supabaseUrl = 'https://ihuzpqoevnpwesqagsbv.supabase.co';
-    const supabaseAnonKey = 'YOUR_ANON_KEY_HERE';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlodXpwcW9ldm5wd2VzcWFnc2J2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4MzYzNzUsImV4cCI6MjA3MDQxMjM3NX0.XoM0YSz7fr1uKbNAf9FooBHb1rIBgjDtL4rGysacGg4';
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
     });
@@ -50,7 +50,7 @@ export const handler = async (req) => {
     if (error) return withCORS({ error: error.message }, 400);
 
     // ✅ Sign device token
-    const secret = new TextEncoder().encode('YOUR_SERVICE_ROLE_KEY_HERE');
+    const secret = new TextEncoder().encode('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlodXpwcW9ldm5wd2VzcWFnc2J2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDgzNjM3NSwiZXhwIjoyMDcwNDEyMzc1fQ.paG3HH1oe2FT3FeWVy-fXkZMM5SdtCFcq6f-17y1hRU');
     const payload = { device_id: device.device_id, owner_id: userData.user.id };
     const token = await new SignJWT(payload)
       .setProtectedHeader({ alg: 'HS256' })
