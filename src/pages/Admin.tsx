@@ -6,10 +6,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Activity, Shield, Trash2 } from "lucide-react";
+import { Users, Activity, Shield, Trash2, Lock, Loader2 } from "lucide-react";
 
 interface AdminUser {
   id: string;
@@ -17,6 +19,7 @@ interface AdminUser {
   name: string;
   subscription_tier: 'free' | 'premium';
   created_at: string;
+  is_admin: boolean;
 }
 
 interface AdminDevice {
@@ -35,31 +38,48 @@ const Admin = () => {
   const [devices, setDevices] = useState<AdminDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminCount, setAdminCount] = useState(0);
+  const [setupMode, setSetupMode] = useState(false);
+  const [setupPassword, setSetupPassword] = useState("");
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupError, setSetupError] = useState("");
+
+  // Admin setup password (should be stored in environment variables)
+  const ADMIN_SETUP_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_SETUP_PASSWORD || "admin123";
 
   useEffect(() => {
     checkAdminStatus();
   }, [user]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdmin || setupMode) {
       fetchUsers();
       fetchDevices();
     }
-  }, [isAdmin]);
+  }, [isAdmin, setupMode]);
 
   const checkAdminStatus = async () => {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase.rpc('is_admin');
-      if (error) throw error;
-      setIsAdmin(data);
-      if (!data) {
-        toast({
-          title: "Access Denied",
-          description: "You don't have admin privileges.",
-          variant: "destructive",
-        });
+      // Check if user is admin
+      const { data: isAdminData, error: adminError } = await supabase.rpc('is_admin');
+      if (adminError) throw adminError;
+      
+      // Check how many admins exist
+      const { count, error: countError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact' })
+        .eq('is_admin', true);
+      
+      if (countError) throw countError;
+      
+      setAdminCount(count || 0);
+      setIsAdmin(!!isAdminData);
+      
+      // If no admins exist, enable setup mode
+      if (count === 0) {
+        setSetupMode(true);
       }
     } catch (error) {
       console.error('Error checking admin status:', error);
@@ -73,7 +93,7 @@ const Admin = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, name, subscription_tier, created_at')
+        .select('id, email, name, subscription_tier, created_at, is_admin')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -166,10 +186,137 @@ const Admin = () => {
     }
   };
 
+  const makeAdmin = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_admin: true })
+        .eq('id', userId);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "User granted admin privileges.",
+      });
+      
+      fetchUsers();
+      checkAdminStatus();
+    } catch (error) {
+      console.error('Error making user admin:', error);
+      toast({
+        title: "Error",
+        description: "Failed to grant admin privileges.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSetupSubmit = async () => {
+    if (!setupPassword) {
+      setSetupError("Please enter the setup password");
+      return;
+    }
+    
+    if (setupPassword !== ADMIN_SETUP_PASSWORD) {
+      setSetupError("Invalid setup password");
+      return;
+    }
+
+    setSetupLoading(true);
+    
+    try {
+      if (!user) throw new Error("User not authenticated");
+      
+      // Make current user admin
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_admin: true })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Admin Setup Complete",
+        description: "You now have administrator privileges.",
+      });
+      
+      setIsAdmin(true);
+      setSetupMode(false);
+    } catch (error) {
+      console.error('Error completing admin setup:', error);
+      setSetupError("Failed to complete setup. Please try again.");
+    } finally {
+      setSetupLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
-        <div className="animate-pulse">Loading admin dashboard...</div>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  // Admin setup screen (when no admins exist)
+  if (setupMode) {
+    return (
+      <div className="container mx-auto p-6 max-w-md">
+        <Card className="border border-blue-500">
+          <CardHeader className="text-center">
+            <Lock className="h-12 w-12 mx-auto mb-4 text-blue-500" />
+            <CardTitle className="text-2xl">Admin Setup Required</CardTitle>
+            <p className="text-muted-foreground">
+              No administrator accounts exist. Complete setup to continue.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="setup-password">Setup Password</Label>
+                <Input
+                  id="setup-password"
+                  type="password"
+                  placeholder="Enter setup password"
+                  value={setupPassword}
+                  onChange={(e) => {
+                    setSetupPassword(e.target.value);
+                    setSetupError("");
+                  }}
+                />
+                {setupError && (
+                  <p className="text-sm text-red-500">{setupError}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  You need the admin setup password to complete this process
+                </p>
+              </div>
+              
+              <Button
+                className="w-full"
+                onClick={handleSetupSubmit}
+                disabled={setupLoading}
+              >
+                {setupLoading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Lock className="h-4 w-4 mr-2" />
+                )}
+                Complete Admin Setup
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <div className="mt-6 text-center text-sm text-muted-foreground">
+          <p>After setup, you'll have full administrator privileges.</p>
+          <p className="mt-2">
+            Contact support if you've lost the setup password.
+          </p>
+        </div>
       </div>
     );
   }
@@ -182,7 +329,19 @@ const Admin = () => {
             <div className="text-center">
               <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <h2 className="text-lg font-semibold mb-2">Access Denied</h2>
-              <p className="text-muted-foreground">You don't have admin privileges to access this page.</p>
+              <p className="text-muted-foreground mb-4">
+                You don't have administrator privileges to access this page.
+              </p>
+              {adminCount === 0 ? (
+                <Button onClick={() => setSetupMode(true)}>
+                  <Lock className="h-4 w-4 mr-2" />
+                  Setup Admin Account
+                </Button>
+              ) : (
+                <p className="text-sm">
+                  Contact an administrator to request access.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -220,12 +379,12 @@ const Admin = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Premium Users</CardTitle>
+            <CardTitle className="text-sm font-medium">Administrators</CardTitle>
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {users.filter(u => u.subscription_tier === 'premium').length}
+              {users.filter(u => u.is_admin).length}
             </div>
           </CardContent>
         </Card>
@@ -235,6 +394,7 @@ const Admin = () => {
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="devices">Devices</TabsTrigger>
+          <TabsTrigger value="admin">Admin Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -249,6 +409,7 @@ const Admin = () => {
                     <TableHead>Email</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Subscription</TableHead>
+                    <TableHead>Admin</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -264,9 +425,14 @@ const Admin = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {new Date(user.created_at).toLocaleDateString()}
+                        <Badge variant={user.is_admin ? 'default' : 'outline'}>
+                          {user.is_admin ? 'Yes' : 'No'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="flex gap-2">
                         <Select
                           value={user.subscription_tier}
                           onValueChange={(value: 'free' | 'premium') => updateUserTier(user.id, value)}
@@ -279,6 +445,17 @@ const Admin = () => {
                             <SelectItem value="premium">Premium</SelectItem>
                           </SelectContent>
                         </Select>
+                        
+                        {!user.is_admin && (
+                          <Button 
+                            variant="secondary" 
+                            size="sm"
+                            onClick={() => makeAdmin(user.id)}
+                          >
+                            <Shield className="h-4 w-4 mr-1" />
+                            Make Admin
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -343,10 +520,58 @@ const Admin = () => {
             </CardContent>
           </Card>
         </TabsContent>
+        
+        <TabsContent value="admin">
+          <Card>
+            <CardHeader>
+              <CardTitle>Admin Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Admin Accounts</h3>
+                  <div className="space-y-3">
+                    {users.filter(u => u.is_admin).map(admin => (
+                      <div key={admin.id} className="flex items-center justify-between p-2 border rounded">
+                        <div>
+                          <p className="font-medium">{admin.name || admin.email}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Added: {new Date(admin.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Badge variant="default">Administrator</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Danger Zone</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Reset Setup Mode</p>
+                        <p className="text-sm text-muted-foreground">
+                          Allow admin setup again (requires setup password)
+                        </p>
+                      </div>
+                      <Button 
+                        variant="outline"
+                        onClick={() => setSetupMode(true)}
+                      >
+                        <Lock className="h-4 w-4 mr-2" />
+                        Reset Setup
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
 };
 
 export default Admin;
-
