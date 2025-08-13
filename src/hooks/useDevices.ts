@@ -38,7 +38,6 @@ export const useDevices = () => {
 
       if (error) throw error;
 
-      // Add latest reading to each device
       return data.map(device => ({
         ...device,
         latest_reading: device.readings?.[0] || null
@@ -66,18 +65,25 @@ export const useAddDevice = () => {
         throw new Error('No access token found. Please log in again.');
       }
 
-      // Call the Edge Function with explicit Authorization header
-      // CRITICAL FIX: Added Content-Type header to satisfy CORS preflight
-      const { data: response, error } = await supabase.functions.invoke('register-device', {
-        body: { device_id, name },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json', // Added this header
-        },
-      });
+      // Call the Edge Function
+      const response = await fetch(
+        'https://ihuzpqoevnpwesqagsbv.supabase.co/functions/v1/register-device',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({ device_id, name })
+        }
+      );
 
-      if (error) throw error;
-      return response;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+      }
+
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] });
