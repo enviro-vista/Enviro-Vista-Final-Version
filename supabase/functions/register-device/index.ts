@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { SignJWT } from 'npm:jose@5.6.3';
+import { SignJWT } from 'https://esm.sh/jose@5.6.3'; // FIXED IMPORT
 
 // Use environment variables
 const supabaseUrl = Deno.env.get('SB_URL') || 'https://ihuzpqoevnpwesqagsbv.supabase.co';
@@ -24,7 +24,7 @@ const setCorsHeaders = (req) => {
   // Set allowed origin if in whitelist
   if (allowedOrigins.includes(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
-    headers['Vary'] = 'Origin'; // Important for caching
+    headers['Vary'] = 'Origin';
   }
   
   return headers;
