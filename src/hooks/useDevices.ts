@@ -47,6 +47,71 @@ export const useDevices = () => {
   });
 };
 
+// Add to the existing file
+export const useUpdateDevice = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { data, error } = await supabase
+        .from('devices')
+        .update({ name })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (updatedDevice) => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
+      toast({
+        title: "Success",
+        description: "Device name updated successfully!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update device",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useDeleteDevice = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (deviceId: string) => {
+      const { error } = await supabase
+        .from('devices')
+        .delete()
+        .eq('id', deviceId);
+
+      if (error) throw error;
+      return deviceId;
+    },
+    onSuccess: (deletedDeviceId) => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
+      toast({
+        title: "Success",
+        description: "Device deleted successfully!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete device",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
 export const useAddDevice = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
