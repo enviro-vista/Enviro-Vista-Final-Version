@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { SignJWT } from 'jose';
 
 export interface Device {
   id: string;
@@ -52,38 +53,40 @@ export const useAddDevice = () => {
 
   return useMutation({
     mutationFn: async ({ device_id, name }: { device_id: string; name: string }) => {
-      // Ensure user is authenticated
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData.user) {
-        throw userError || new Error('Not authenticated');
+      // Get current user session
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        throw authError || new Error('User not authenticated');
       }
 
-      // Get the access token
-      const session = await supabase.auth.getSession();
-      const accessToken = session.data.session?.access_token;
-      if (!accessToken) {
-        throw new Error('No access token found. Please log in again.');
+      // Insert device directly into database
+      const { data: device, error: insertError } = await supabase
+        .from('devices')
+        .insert([{ device_id, name, owner_id: user.id }])
+        .select()
+        .single();
+
+      if (insertError) {
+        throw insertError;
       }
 
-      // Call the Edge Function
-      const response = await fetch(
-        'https://ihuzpqoevnpwesqagsbv.supabase.co/functions/v1/register-device',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
-          },
-          body: JSON.stringify({ device_id, name })
-        }
+      // Generate JWT token client-side
+      const secret = new TextEncoder().encode(
+        process.env.NEXT_PUBLIC_DEVICE_JWT_SECRET || 't3fYXmyny2Hvf+ZBd4jUp3ixZRySEnNtx7iArRZuCdqtmtBR7KvNLn/4G957qBHDnK1uovHokQITGQF8behvVA=='
       );
+      
+      const payload = { 
+        device_id: device.device_id, 
+        owner_id: user.id,
+        exp: Math.floor(Date.now() / 1000) + (10 * 365 * 24 * 60 * 60) // 10 years
+      };
+      
+      const token = await new SignJWT(payload)
+        .setProtectedHeader({ alg: 'HS256' })
+        .sign(secret);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Request failed with status ${response.status}`);
-      }
-
-      return await response.json();
+      return { token, device };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] });
