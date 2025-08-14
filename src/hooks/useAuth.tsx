@@ -10,6 +10,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<any>;
   signUp: (email: string, password: string, name?: string) => Promise<any>;
   signOut: () => Promise<void>;
+  checkSubscription: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,6 +60,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await supabase.auth.signOut();
   };
 
+  const checkSubscription = async () => {
+    try {
+      await supabase.functions.invoke('check-subscription');
+    } catch (error) {
+      console.error('Failed to check subscription:', error);
+    }
+  };
+
+  // Check subscription status on auth state change
+  useEffect(() => {
+    if (user) {
+      checkSubscription();
+    }
+  }, [user]);
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -67,6 +83,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       signIn,
       signUp,
       signOut,
+      checkSubscription,
     }}>
       {children}
     </AuthContext.Provider>

@@ -12,5 +12,8 @@ verify_jwt = false
 [functions.subscribe]
 verify_jwt = true
 
+[functions.check-subscription]
+verify_jwt = true
+
 [functions.fetch-readings]
 verify_jwt = true

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,15 +13,20 @@ import {
   Grid3X3,
   Wifi,
   WifiOff,
-  LogOut
+  LogOut,
+  Crown,
+  Zap
 } from "lucide-react";
 import MetricCard from "@/components/MetricCard";
 import DeviceCard from "@/components/DeviceCard";
 import ChartView from "@/components/ChartView";
 import AddDeviceDialog from "@/components/AddDeviceDialog";
 import Header from "@/components/Header";
+import SubscriptionStatusBadge from "@/components/SubscriptionStatusBadge";
+import UpgradePrompt from "@/components/UpgradePrompt";
 import { useDevices } from "@/hooks/useDevices";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscriptionStatus, useCheckSubscription } from "@/hooks/useSubscription";
 import {
   Dialog,
   DialogContent,
@@ -37,8 +42,11 @@ import { toast } from "@/hooks/use-toast";
 const Index = () => {
   const [activeView, setActiveView] = useState<'grid' | 'chart'>('grid');
   const [selectedDevice, setSelectedDevice] = useState<string>('all');
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const { data: devices = [], isLoading } = useDevices();
   const { signOut } = useAuth();
+  const { isPremium, isFree } = useSubscriptionStatus();
+  const checkSubscription = useCheckSubscription();
   const [liveMonitoring, setLiveMonitoring] = useState<boolean>(() => JSON.parse(localStorage.getItem("settings.liveMonitoring") ?? "true"));
   const [alertsEnabled, setAlertsEnabled] = useState<boolean>(() => JSON.parse(localStorage.getItem("settings.alertsEnabled") ?? "true"));
 
@@ -79,6 +87,34 @@ const Index = () => {
     await signOut();
   };
 
+  // Show upgrade prompt for free users periodically and on first load
+  useEffect(() => {
+    if (isFree) {
+      // Show immediately on first load
+      setShowUpgradePrompt(true);
+      
+      // Show every 5 minutes for free users
+      const interval = setInterval(() => {
+        setShowUpgradePrompt(true);
+      }, 5 * 60 * 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [isFree]);
+
+  // Refresh subscription status
+  useEffect(() => {
+    checkSubscription.mutate();
+  }, []);
+
+  const dismissUpgradePrompt = () => {
+    setShowUpgradePrompt(false);
+    // Don't show again for 10 minutes
+    setTimeout(() => {
+      if (isFree) setShowUpgradePrompt(true);
+    }, 10 * 60 * 1000);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-dashboard-bg flex items-center justify-center">
@@ -91,10 +127,21 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-dashboard-bg">
+    <div className="min-h-screen">
       <Header />
       
       <main className="container mx-auto px-4 py-6 space-y-6">
+        
+        {/* Upgrade Prompt for Free Users */}
+        {isFree && showUpgradePrompt && (
+          <div className="animate-slide-up">
+            <UpgradePrompt 
+              title="🚀 Unlock Premium Environmental Data" 
+              description="Access CO₂ monitoring, advanced metrics, light sensors, and soil monitoring"
+              onDismiss={dismissUpgradePrompt}
+            />
+          </div>
+        )}
         {/* Overview Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
@@ -143,6 +190,7 @@ const Index = () => {
                 <WifiOff className="h-5 w-5 text-muted-foreground" />
                 <span className="text-sm font-medium">{devices.length - onlineDevices} Offline</span>
               </div>
+              <SubscriptionStatusBadge />
             </div>
             <div className="flex gap-2">
               <AddDeviceDialog />
@@ -216,17 +264,29 @@ const Index = () => {
 
         {/* Main Content */}
         {activeView === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {devices.length > 0 ? (
-              devices.map((device) => (
-                <DeviceCard key={device.id} device={device} />
-              ))
-            ) : (
+          <div className="space-y-6">
+            {/* Inline upgrade prompt in data section for free users */}
+            {isFree && (
+              <UpgradePrompt 
+                title="Premium Sensors & Metrics" 
+                description="Unlock CO₂, light sensors, soil monitoring, and advanced calculated metrics"
+                compact={true}
+                onDismiss={() => {}}
+              />
+            )}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {devices.length > 0 ? (
+                devices.map((device) => (
+                  <DeviceCard key={device.id} device={device} onDeviceUpdated={() => {}} />
+                ))
+              ) : (
               <div className="col-span-full text-center py-12">
                 <p className="text-muted-foreground mb-4">No devices found. Add your first device to get started!</p>
                 <AddDeviceDialog />
               </div>
             )}
+            </div>
           </div>
         ) : (
           <ChartView devices={devices} selectedDevice={selectedDevice} />

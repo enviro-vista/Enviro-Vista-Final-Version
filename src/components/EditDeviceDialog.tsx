@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
-import { useUpdateDevice } from '@/hooks/useDevices';
+import { useUpdateDevice, Device } from '@/hooks/useDevices';
 import { useToast } from '@/hooks/use-toast';
 
 interface EditDeviceDialogProps {

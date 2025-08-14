@@ -3,73 +3,78 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Climate Pulse Suite Design System - IoT Environmental Monitoring */
+/* Enviro-Vista Design System - Premium Environmental Monitoring */
 
 @layer base {
   :root {
-    /* Base colors */
-    --background: 210 20% 98%;
-    --foreground: 210 40% 12%;
+    /* Base colors - Clean and modern */
+    --background: 220 15% 97%;
+    --foreground: 220 40% 8%;
 
-    /* Primary - Climate Blue */
-    --primary: 200 95% 45%;
+    /* Primary - Modern Teal */
+    --primary: 180 75% 35%;
     --primary-foreground: 0 0% 100%;
+    --primary-glow: 180 85% 45%;
 
-    /* Secondary - Fresh Green */
-    --secondary: 140 70% 95%;
-    --secondary-foreground: 140 70% 15%;
+    /* Secondary - Nature Green */
+    --secondary: 150 45% 85%;
+    --secondary-foreground: 150 60% 15%;
 
-    /* Accent - Ocean Teal */
-    --accent: 180 85% 90%;
-    --accent-foreground: 180 85% 15%;
+    /* Accent - Sky Blue */
+    --accent: 200 85% 88%;
+    --accent-foreground: 200 75% 20%;
 
-    /* Climate-specific colors */
+    /* Environmental sensor colors */
     --temperature: 15 85% 55%;
     --humidity: 200 85% 60%;
     --pressure: 270 75% 65%;
     --dewpoint: 160 80% 50%;
+    --premium: 45 95% 55%;
 
     /* UI colors */
     --card: 0 0% 100%;
-    --card-foreground: 210 40% 12%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 210 20% 45%;
-    --border: 210 40% 88%;
-    --input: 210 40% 88%;
-    --ring: 200 95% 45%;
+    --card-foreground: 220 40% 8%;
+    --muted: 220 30% 92%;
+    --muted-foreground: 220 25% 45%;
+    --border: 220 35% 85%;
+    --input: 220 35% 85%;
+    --ring: 180 75% 35%;
 
     /* Status colors */
-    --success: 140 70% 50%;
+    --success: 150 70% 45%;
     --warning: 45 90% 55%;
     --destructive: 0 75% 60%;
     --destructive-foreground: 0 0% 100%;
 
     /* Dashboard specific */
-    --dashboard-bg: 210 30% 96%;
-    --card-hover: 0 0% 98%;
-    --metric-bg: linear-gradient(135deg, hsl(200 100% 98%) 0%, hsl(180 100% 98%) 100%);
+    --dashboard-bg: linear-gradient(135deg, hsl(220 25% 95%) 0%, hsl(200 30% 92%) 100%);
+    --card-hover: 220 20% 98%;
+    --glass-bg: 220 50% 98%;
+    --metric-bg: linear-gradient(135deg, hsl(180 70% 96%) 0%, hsl(200 60% 94%) 100%);
 
     --radius: 0.75rem;
   }
 
   .dark {
-    --background: 210 50% 8%;
-    --foreground: 210 40% 95%;
-    --primary: 200 95% 55%;
-    --primary-foreground: 210 50% 8%;
-    --secondary: 140 30% 15%;
-    --secondary-foreground: 140 70% 85%;
-    --accent: 180 50% 20%;
-    --accent-foreground: 180 85% 85%;
-    --card: 210 50% 10%;
-    --card-foreground: 210 40% 95%;
-    --muted: 210 40% 15%;
-    --muted-foreground: 210 20% 65%;
-    --border: 210 40% 20%;
-    --input: 210 40% 20%;
-    --dashboard-bg: 210 50% 6%;
-    --card-hover: 210 50% 12%;
-    --metric-bg: linear-gradient(135deg, hsl(200 50% 12%) 0%, hsl(180 50% 12%) 100%);
+    --background: 220 50% 6%;
+    --foreground: 220 30% 92%;
+    --primary: 180 85% 45%;
+    --primary-foreground: 220 50% 6%;
+    --primary-glow: 180 95% 55%;
+    --secondary: 150 25% 15%;
+    --secondary-foreground: 150 70% 85%;
+    --accent: 200 40% 20%;
+    --accent-foreground: 200 75% 85%;
+    --card: 220 50% 8%;
+    --card-foreground: 220 30% 92%;
+    --muted: 220 40% 12%;
+    --muted-foreground: 220 20% 65%;
+    --border: 220 40% 18%;
+    --input: 220 40% 18%;
+    --dashboard-bg: linear-gradient(135deg, hsl(220 50% 4%) 0%, hsl(200 45% 6%) 100%);
+    --card-hover: 220 50% 10%;
+    --glass-bg: 220 50% 8%;
+    --metric-bg: linear-gradient(135deg, hsl(180 40% 8%) 0%, hsl(200 35% 10%) 100%);
   }
 }
 
@@ -79,7 +84,8 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply text-foreground antialiased;
+    background: var(--dashboard-bg);
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
@@ -102,22 +108,38 @@
 }
 
 @layer components {
-  /* Glassmorphism effect for cards */
+  /* Enhanced glassmorphism effect for modern cards */
   .glass-card {
-    @apply backdrop-blur-sm bg-card/80 border border-border/50;
+    @apply backdrop-blur-md border border-border/40;
+    background: hsla(var(--glass-bg) / 0.85);
+    box-shadow: 
+      0 4px 6px -1px rgb(0 0 0 / 0.1),
+      0 2px 4px -2px rgb(0 0 0 / 0.1),
+      inset 0 1px 0 0 rgb(255 255 255 / 0.1);
   }
 
-  /* Metric cards */
+  /* Premium metric cards with elevated design */
   .metric-card {
     @apply relative overflow-hidden rounded-xl p-6;
     background: var(--metric-bg);
-    border: 1px solid hsl(var(--border) / 0.5);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid hsl(var(--border) / 0.4);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+      0 1px 3px 0 rgb(0 0 0 / 0.1),
+      0 1px 2px -1px rgb(0 0 0 / 0.1);
   }
 
   .metric-card:hover {
-    @apply scale-[1.02] shadow-lg;
+    @apply scale-[1.02];
+    box-shadow: 
+      0 10px 15px -3px rgb(0 0 0 / 0.1),
+      0 4px 6px -4px rgb(0 0 0 / 0.1);
     background: var(--card-hover);
+  }
+
+  /* Premium indicator gradient */
+  .premium-gradient {
+    background: linear-gradient(135deg, hsl(45 95% 55%) 0%, hsl(25 95% 60%) 100%);
   }
 
   /* Data visualization */
