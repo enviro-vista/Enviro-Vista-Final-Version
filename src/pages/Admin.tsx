@@ -1,84 +1,89 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Users, 
-  Database, 
-  Shield, 
-  Settings,
-  AlertTriangle,
-  Trash,
-  Crown,
-  ChevronLeft
-} from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import Header from '@/components/Header';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { Users, Activity, Shield, Trash2, Lock, Loader2 } from "lucide-react";
 
 interface AdminUser {
   id: string;
-  email: string | null;
-  name: string | null;
+  email: string;
+  name: string;
   subscription_tier: 'free' | 'premium';
   created_at: string;
+  is_admin: boolean;
 }
 
-interface Device {
+interface AdminDevice {
   id: string;
   device_id: string;
   name: string;
   owner_id: string;
+  owner_email: string;
   created_at: string;
 }
 
 const Admin = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    premiumUsers: 0,
-    totalDevices: 0,
-    totalReadings: 0,
-  });
+  const [devices, setDevices] = useState<AdminDevice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminCount, setAdminCount] = useState(0);
+  const [setupMode, setSetupMode] = useState(false);
+  const [setupPassword, setSetupPassword] = useState("");
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupError, setSetupError] = useState("");
+
+  // Admin setup password (should be stored in environment variables)
+  const ADMIN_SETUP_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_SETUP_PASSWORD || "admin123";
 
   useEffect(() => {
     checkAdminStatus();
   }, [user]);
 
-  const checkAdminStatus = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
+  useEffect(() => {
+    if (isAdmin || setupMode) {
+      fetchUsers();
+      fetchDevices();
     }
+  }, [isAdmin, setupMode]);
+
+  const checkAdminStatus = async () => {
+    if (!user) return;
     
     try {
-      // Check if user is admin using the is_admin function
+      // Check if user is admin
       const { data: isAdminData, error: adminError } = await supabase.rpc('is_admin');
       if (adminError) throw adminError;
       
+      // Check how many admins exist
+      const { count, error: countError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact' })
+        .eq('is_admin', true);
+      
+      if (countError) throw countError;
+      
+      setAdminCount(count || 0);
       setIsAdmin(!!isAdminData);
       
-      if (isAdminData) {
-        await Promise.all([fetchUsers(), fetchDevices(), fetchStats()]);
+      // If no admins exist, enable setup mode
+      if (count === 0) {
+        setSetupMode(true);
       }
     } catch (error) {
       console.error('Error checking admin status:', error);
-      toast({
-        title: "Error",
-        description: "Failed to verify admin status.",
-        variant: "destructive",
-      });
+      setIsAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -88,7 +93,7 @@ const Admin = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, name, subscription_tier, created_at')
+        .select('id, email, name, subscription_tier, created_at, is_admin')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -107,11 +112,20 @@ const Admin = () => {
     try {
       const { data, error } = await supabase
         .from('devices')
-        .select('id, device_id, name, owner_id, created_at')
+        .select(`
+          id, device_id, name, owner_id, created_at,
+          profiles!devices_owner_id_fkey(email)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setDevices(data || []);
+      
+      const devicesWithOwner = data?.map(device => ({
+        ...device,
+        owner_email: (device.profiles as any)?.email || 'Unknown'
+      })) || [];
+      
+      setDevices(devicesWithOwner);
     } catch (error) {
       console.error('Error fetching devices:', error);
       toast({
@@ -122,79 +136,7 @@ const Admin = () => {
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      // Get user counts
-      const { count: totalUsers, error: usersError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact' });
-
-      if (usersError) throw usersError;
-
-      // Get premium user counts
-      const { count: premiumUsers, error: premiumError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact' })
-        .eq('subscription_tier', 'premium');
-
-      if (premiumError) throw premiumError;
-
-      // Get device counts
-      const { count: totalDevices, error: devicesError } = await supabase
-        .from('devices')
-        .select('*', { count: 'exact' });
-
-      if (devicesError) throw devicesError;
-
-      // Get readings count
-      const { count: totalReadings, error: readingsError } = await supabase
-        .from('sensor_readings')
-        .select('*', { count: 'exact' });
-
-      if (readingsError) throw readingsError;
-
-      setStats({
-        totalUsers: totalUsers || 0,
-        premiumUsers: premiumUsers || 0,
-        totalDevices: totalDevices || 0,
-        totalReadings: totalReadings || 0,
-      });
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
-
-  const deleteDevice = async (deviceId: string) => {
-    if (!confirm('Are you sure you want to delete this device? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('devices')
-        .delete()
-        .eq('id', deviceId);
-
-      if (error) throw error;
-      
-      toast({
-        title: "Success",
-        description: "Device deleted successfully.",
-      });
-      
-      await fetchDevices();
-      await fetchStats();
-    } catch (error) {
-      console.error('Error deleting device:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete device.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const updateUserSubscription = async (userId: string, tier: 'free' | 'premium') => {
+  const updateUserTier = async (userId: string, tier: 'free' | 'premium') => {
     try {
       const { error } = await supabase
         .from('profiles')
@@ -208,10 +150,9 @@ const Admin = () => {
         description: `User subscription updated to ${tier}.`,
       });
       
-      await fetchUsers();
-      await fetchStats();
+      fetchUsers();
     } catch (error) {
-      console.error('Error updating subscription:', error);
+      console.error('Error updating user tier:', error);
       toast({
         title: "Error",
         description: "Failed to update user subscription.",
@@ -220,12 +161,161 @@ const Admin = () => {
     }
   };
 
+  const deleteDevice = async (deviceId: string) => {
+    try {
+      const { error } = await supabase
+        .from('devices')
+        .delete()
+        .eq('id', deviceId);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Device deleted successfully.",
+      });
+      
+      fetchDevices();
+    } catch (error) {
+      console.error('Error deleting device:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete device.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const makeAdmin = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_admin: true })
+        .eq('id', userId);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "User granted admin privileges.",
+      });
+      
+      fetchUsers();
+      checkAdminStatus();
+    } catch (error) {
+      console.error('Error making user admin:', error);
+      toast({
+        title: "Error",
+        description: "Failed to grant admin privileges.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSetupSubmit = async () => {
+    if (!setupPassword) {
+      setSetupError("Please enter the setup password");
+      return;
+    }
+    
+    if (setupPassword !== ADMIN_SETUP_PASSWORD) {
+      setSetupError("Invalid setup password");
+      return;
+    }
+
+    setSetupLoading(true);
+    
+    try {
+      if (!user) throw new Error("User not authenticated");
+      
+      // Make current user admin
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_admin: true })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Admin Setup Complete",
+        description: "You now have administrator privileges.",
+      });
+      
+      setIsAdmin(true);
+      setSetupMode(false);
+    } catch (error) {
+      console.error('Error completing admin setup:', error);
+      setSetupError("Failed to complete setup. Please try again.");
+    } finally {
+      setSetupLoading(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-dashboard-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Checking admin access...</p>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  // Admin setup screen (when no admins exist)
+  if (setupMode) {
+    return (
+      <div className="container mx-auto p-6 max-w-md">
+        <Card className="border border-blue-500">
+          <CardHeader className="text-center">
+            <Lock className="h-12 w-12 mx-auto mb-4 text-blue-500" />
+            <CardTitle className="text-2xl">Admin Setup Required</CardTitle>
+            <p className="text-muted-foreground">
+              No administrator accounts exist. Complete setup to continue.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="setup-password">Setup Password</Label>
+                <Input
+                  id="setup-password"
+                  type="password"
+                  placeholder="Enter setup password"
+                  value={setupPassword}
+                  onChange={(e) => {
+                    setSetupPassword(e.target.value);
+                    setSetupError("");
+                  }}
+                />
+                {setupError && (
+                  <p className="text-sm text-red-500">{setupError}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  You need the admin setup password to complete this process
+                </p>
+              </div>
+              
+              <Button
+                className="w-full"
+                onClick={handleSetupSubmit}
+                disabled={setupLoading}
+              >
+                {setupLoading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Lock className="h-4 w-4 mr-2" />
+                )}
+                Complete Admin Setup
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <div className="mt-6 text-center text-sm text-muted-foreground">
+          <p>After setup, you'll have full administrator privileges.</p>
+          <p className="mt-2">
+            Contact support if you've lost the setup password.
+          </p>
         </div>
       </div>
     );
@@ -233,185 +323,253 @@ const Admin = () => {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-dashboard-bg">
-        <Header />
-        <main className="container mx-auto px-4 py-6">
-          <Card className="max-w-md mx-auto">
-            <CardHeader className="text-center">
-              <Shield className="w-12 h-12 mx-auto text-destructive mb-4" />
-              <CardTitle>Access Denied</CardTitle>
-            </CardHeader>
-            <CardContent className="text-center">
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h2 className="text-lg font-semibold mb-2">Access Denied</h2>
               <p className="text-muted-foreground mb-4">
                 You don't have administrator privileges to access this page.
               </p>
-              <Button onClick={() => navigate('/')} className="w-full">
-                <ChevronLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </Button>
-            </CardContent>
-          </Card>
-        </main>
+              {adminCount === 0 ? (
+                <Button onClick={() => setSetupMode(true)}>
+                  <Lock className="h-4 w-4 mr-2" />
+                  Setup Admin Account
+                </Button>
+              ) : (
+                <p className="text-sm">
+                  Contact an administrator to request access.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-dashboard-bg">
-      <Header />
-      
-      <main className="container mx-auto px-4 py-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/60 rounded-full flex items-center justify-center">
-              <Shield className="w-5 h-5 text-white" />
+    <div className="container mx-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <p className="text-muted-foreground">Manage users, devices, and platform settings</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{users.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Devices</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{devices.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Administrators</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {users.filter(u => u.is_admin).length}
             </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-              <p className="text-muted-foreground">System management and analytics</p>
-            </div>
-          </div>
-          <Button variant="outline" onClick={() => navigate('/')}>
-            <ChevronLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
+          </CardContent>
+        </Card>
+      </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Users</p>
-                  <p className="text-2xl font-bold">{stats.totalUsers}</p>
-                </div>
-                <Users className="w-8 h-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Premium Users</p>
-                  <p className="text-2xl font-bold">{stats.premiumUsers}</p>
-                </div>
-                <Crown className="w-8 h-8 text-amber-500" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Devices</p>
-                  <p className="text-2xl font-bold">{stats.totalDevices}</p>
-                </div>
-                <Database className="w-8 h-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Readings</p>
-                  <p className="text-2xl font-bold">{stats.totalReadings.toLocaleString()}</p>
-                </div>
-                <Settings className="w-8 h-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="devices">Devices</TabsTrigger>
+          <TabsTrigger value="admin">Admin Settings</TabsTrigger>
+        </TabsList>
 
-        {/* Management Tabs */}
-        <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="users">User Management</TabsTrigger>
-            <TabsTrigger value="devices">Device Management</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="users">
-            <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+        <TabsContent value="users">
+          <Card>
+            <CardHeader>
+              <CardTitle>User Management</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Subscription</TableHead>
+                    <TableHead>Admin</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {users.map((user) => (
-                    <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-1">
-                        <p className="font-medium">{user.name || 'No name'}</p>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Joined: {new Date(user.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
+                    <TableRow key={user.id}>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>{user.name || 'N/A'}</TableCell>
+                      <TableCell>
                         <Badge variant={user.subscription_tier === 'premium' ? 'default' : 'secondary'}>
-                          {user.subscription_tier === 'premium' ? (
-                            <>
-                              <Crown className="w-3 h-3 mr-1" />
-                              Premium
-                            </>
-                          ) : (
-                            'Free'
-                          )}
+                          {user.subscription_tier}
                         </Badge>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateUserSubscription(
-                            user.id, 
-                            user.subscription_tier === 'premium' ? 'free' : 'premium'
-                          )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={user.is_admin ? 'default' : 'outline'}>
+                          {user.is_admin ? 'Yes' : 'No'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="flex gap-2">
+                        <Select
+                          value={user.subscription_tier}
+                          onValueChange={(value: 'free' | 'premium') => updateUserTier(user.id, value)}
                         >
-                          {user.subscription_tier === 'premium' ? 'Downgrade' : 'Upgrade'}
-                        </Button>
-                      </div>
-                    </div>
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="free">Free</SelectItem>
+                            <SelectItem value="premium">Premium</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        
+                        {!user.is_admin && (
+                          <Button 
+                            variant="secondary" 
+                            size="sm"
+                            onClick={() => makeAdmin(user.id)}
+                          >
+                            <Shield className="h-4 w-4 mr-1" />
+                            Make Admin
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <TabsContent value="devices">
-            <Card>
-              <CardHeader>
-                <CardTitle>Device Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+        <TabsContent value="devices">
+          <Card>
+            <CardHeader>
+              <CardTitle>Device Management</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Device ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {devices.map((device) => (
-                    <div key={device.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-1">
-                        <p className="font-medium">{device.name}</p>
-                        <p className="text-sm text-muted-foreground">ID: {device.device_id}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Created: {new Date(device.created_at).toLocaleDateString()}
+                    <TableRow key={device.id}>
+                      <TableCell className="font-mono text-sm">{device.device_id}</TableCell>
+                      <TableCell>{device.name}</TableCell>
+                      <TableCell>{device.owner_email}</TableCell>
+                      <TableCell>
+                        {new Date(device.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Device</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete device {device.device_id}? This action cannot be undone and will also delete all associated sensor readings.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteDevice(device.id)}>
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="admin">
+          <Card>
+            <CardHeader>
+              <CardTitle>Admin Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Admin Accounts</h3>
+                  <div className="space-y-3">
+                    {users.filter(u => u.is_admin).map(admin => (
+                      <div key={admin.id} className="flex items-center justify-between p-2 border rounded">
+                        <div>
+                          <p className="font-medium">{admin.name || admin.email}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Added: {new Date(admin.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Badge variant="default">Administrator</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Danger Zone</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Reset Setup Mode</p>
+                        <p className="text-sm text-muted-foreground">
+                          Allow admin setup again (requires setup password)
                         </p>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => deleteDevice(device.id)}
+                      <Button 
+                        variant="outline"
+                        onClick={() => setSetupMode(true)}
                       >
-                        <Trash className="w-4 h-4 mr-2" />
-                        Delete
+                        <Lock className="h-4 w-4 mr-2" />
+                        Reset Setup
                       </Button>
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
