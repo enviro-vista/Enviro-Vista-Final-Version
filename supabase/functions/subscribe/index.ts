@@ -1,117 +1,98 @@
-
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-export const handler = async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: { ...corsHeaders } });
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
 
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
 
   try {
-    console.log('Subscribe function called');
-    
-    const authHeader = req.headers.get('authorization');
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      console.error('No authorization header');
-      return new Response(JSON.stringify({ error: 'Authorization header required' }), {
+      return new Response(JSON.stringify({ error: "Authorization header required" }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('SB_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SB_ANON_KEY');
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Missing Supabase environment variables');
-      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    if (!supabaseUrl || !serviceRoleKey) {
+      return new Response(JSON.stringify({ error: "Server configuration error" }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
+    // Create client for authentication
+    const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") || "", {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
     if (authError || !user) {
-      console.error('Authentication error:', authError);
-      return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
+      return new Response(JSON.stringify({ error: "Invalid authentication" }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
-    console.log('User authenticated:', user.id, user.email);
+    // Create admin client for database operations
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     const body = await req.json();
-    const { tier = 'premium' } = body;
+    const { tier = "premium" } = body;
 
-    console.log('Subscription request received:', {
-      userId: user.id,
-      email: user.email,
-      tier,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Use service role key for admin operations
-    const supabaseAdmin = createClient(
-      supabaseUrl,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SB_SERVICE_ROLE_KEY')!
-    );
-
+    // Update user subscription
     const { error: updateError } = await supabaseAdmin
-      .from('profiles')
+      .from("profiles")
       .update({ 
         subscription_tier: tier,
         updated_at: new Date().toISOString()
       })
-      .eq('id', user.id);
+      .eq("id", user.id);
 
     if (updateError) {
-      console.error('Error updating subscription:', updateError);
-      return new Response(JSON.stringify({ error: 'Failed to update subscription' }), {
+      console.error("Error updating subscription:", updateError);
+      return new Response(JSON.stringify({ error: "Failed to update subscription" }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
-
-    console.log('Successfully updated user subscription to:', tier);
 
     // Mock Stripe checkout URL for demonstration
     const mockCheckoutUrl = `https://checkout.stripe.com/mock?user=${user.id}&tier=${tier}`;
 
     return new Response(JSON.stringify({ 
       success: true,
-      message: 'Subscription initiated (PLACEHOLDER)',
+      message: "Subscription initiated",
       checkout_url: mockCheckoutUrl,
       tier,
     }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (error) {
-    console.error('Subscribe error:', error);
+    console.error("Subscribe error:", error);
     return new Response(JSON.stringify({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      error: "Internal server error",
+      details: error instanceof Error ? error.message : "Unknown error"
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
-};
-
-export default handler;
+});

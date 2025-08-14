@@ -19,7 +19,6 @@ interface AdminUser {
   name: string;
   subscription_tier: 'free' | 'premium';
   created_at: string;
-  is_admin: boolean;
 }
 
 interface AdminDevice {
@@ -68,9 +67,9 @@ const Admin = () => {
       
       // Check how many admins exist
       const { count, error: countError } = await supabase
-        .from('profiles')
+        .from('user_roles')
         .select('*', { count: 'exact' })
-        .eq('is_admin', true);
+        .eq('role', 'admin');
       
       if (countError) throw countError;
       
@@ -93,7 +92,7 @@ const Admin = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, name, subscription_tier, created_at, is_admin')
+        .select('id, email, name, subscription_tier, created_at')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -189,9 +188,8 @@ const Admin = () => {
   const makeAdmin = async (userId: string) => {
     try {
       const { error } = await supabase
-        .from('profiles')
-        .update({ is_admin: true })
-        .eq('id', userId);
+        .from('user_roles')
+        .insert({ user_id: userId, role: 'admin' });
 
       if (error) throw error;
       
@@ -228,11 +226,10 @@ const Admin = () => {
     try {
       if (!user) throw new Error("User not authenticated");
       
-      // Make current user admin
+      // Make current user admin using user_roles table
       const { error } = await supabase
-        .from('profiles')
-        .update({ is_admin: true })
-        .eq('id', user.id);
+        .from('user_roles')
+        .insert({ user_id: user.id, role: 'admin' });
       
       if (error) throw error;
       
@@ -384,7 +381,7 @@ const Admin = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {users.filter(u => u.is_admin).length}
+              {adminCount}
             </div>
           </CardContent>
         </Card>
@@ -425,8 +422,8 @@ const Admin = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={user.is_admin ? 'default' : 'outline'}>
-                          {user.is_admin ? 'Yes' : 'No'}
+                        <Badge variant="outline">
+                          No
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -446,16 +443,14 @@ const Admin = () => {
                           </SelectContent>
                         </Select>
                         
-                        {!user.is_admin && (
-                          <Button 
-                            variant="secondary" 
-                            size="sm"
-                            onClick={() => makeAdmin(user.id)}
-                          >
-                            <Shield className="h-4 w-4 mr-1" />
-                            Make Admin
-                          </Button>
-                        )}
+                        <Button 
+                          variant="secondary" 
+                          size="sm"
+                          onClick={() => makeAdmin(user.id)}
+                        >
+                          <Shield className="h-4 w-4 mr-1" />
+                          Make Admin
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -531,7 +526,7 @@ const Admin = () => {
                 <div className="border rounded-lg p-4">
                   <h3 className="font-semibold mb-3">Admin Accounts</h3>
                   <div className="space-y-3">
-                    {users.filter(u => u.is_admin).map(admin => (
+                    {users.slice(0, adminCount).map(admin => (
                       <div key={admin.id} className="flex items-center justify-between p-2 border rounded">
                         <div>
                           <p className="font-medium">{admin.name || admin.email}</p>
