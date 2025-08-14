@@ -190,7 +190,7 @@ const Admin = () => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ is_admin: true })
+        .update({ is_admin: true } as any)
         .eq('id', userId);
 
       if (error) throw error;
@@ -231,7 +231,7 @@ const Admin = () => {
       // Make current user admin
       const { error } = await supabase
         .from('profiles')
-        .update({ is_admin: true })
+        .update({ is_admin: true } as any)
         .eq('id', user.id);
       
       if (error) throw error;
