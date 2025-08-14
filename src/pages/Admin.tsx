@@ -44,8 +44,8 @@ const Admin = () => {
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupError, setSetupError] = useState("");
 
-  // Admin setup password (should be stored in environment variables)
-  const ADMIN_SETUP_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_SETUP_PASSWORD || "admin123";
+  // Admin setup password (hardcoded for simplicity - in production use proper auth)
+  const ADMIN_SETUP_PASSWORD = "admin123";
 
   useEffect(() => {
     checkAdminStatus();
