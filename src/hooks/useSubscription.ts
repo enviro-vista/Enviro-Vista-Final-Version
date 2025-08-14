@@ -47,10 +47,10 @@ export const useSubscriptionStatus = () => {
 export const useCheckSubscription = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { session } = useAuth();
   
   return useMutation({
     mutationFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session');
 
       const { data, error } = await supabase.functions.invoke('check-subscription', {
@@ -80,10 +80,10 @@ export const useCheckSubscription = () => {
 export const useUpgradeSubscription = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { session } = useAuth();
   
   return useMutation({
     mutationFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session found');
 
       const { data, error } = await supabase.functions.invoke('subscribe', {
