@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,7 +50,15 @@ export const useCheckSubscription = () => {
   
   return useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('check-subscription');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session');
+
+      const { data, error } = await supabase.functions.invoke('check-subscription', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      
       if (error) throw error;
       return data;
     },
@@ -58,6 +67,7 @@ export const useCheckSubscription = () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
     onError: (error: any) => {
+      console.error('Check subscription error:', error);
       toast({
         title: "Error",
         description: "Failed to check subscription status",
@@ -69,17 +79,29 @@ export const useCheckSubscription = () => {
 
 export const useUpgradeSubscription = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session found');
+
       const { data, error } = await supabase.functions.invoke('subscribe', {
         body: { tier: 'premium' },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Subscription error:', error);
+        throw new Error(error.message || 'Failed to initiate subscription');
+      }
       return data;
     },
     onSuccess: (data) => {
+      console.log('Subscription success:', data);
+      
       if (data.checkout_url) {
         // Open Stripe checkout in a new tab
         window.open(data.checkout_url, '_blank');
@@ -89,8 +111,12 @@ export const useUpgradeSubscription = () => {
         title: "Upgrade Initiated",
         description: "Redirecting to checkout...",
       });
+
+      // Invalidate profile data to refresh subscription status
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
     onError: (error: any) => {
+      console.error('Upgrade error:', error);
       toast({
         title: "Upgrade Failed",
         description: error.message || "Please try again later.",

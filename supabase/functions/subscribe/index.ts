@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -18,32 +19,46 @@ export const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    console.log('Subscribe function called');
+    
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
+      console.error('No authorization header');
       return new Response(JSON.stringify({ error: 'Authorization header required' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
-    const supabaseUrl = Deno.env.get('SB_URL')!;
-    const supabaseKey = Deno.env.get('SB_ANON_KEY')!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('SB_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SB_ANON_KEY');
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase environment variables');
+      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
+      console.error('Authentication error:', authError);
       return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
+    console.log('User authenticated:', user.id, user.email);
+
     const body = await req.json();
     const { tier = 'premium' } = body;
 
-    // PLACEHOLDER: Log the subscription request
     console.log('Subscription request received:', {
       userId: user.id,
       email: user.email,
@@ -51,21 +66,18 @@ export const handler = async (req: Request): Promise<Response> => {
       timestamp: new Date().toISOString(),
     });
 
-    // PLACEHOLDER: Mock Stripe integration
-    // In a real implementation, you would:
-    // 1. Create a Stripe checkout session
-    // 2. Handle the payment webhook
-    // 3. Update the user's subscription tier
-
-    // For now, simulate successful payment and upgrade user
+    // Use service role key for admin operations
     const supabaseAdmin = createClient(
       supabaseUrl,
-      Deno.env.get('SB_SERVICE_ROLE_KEY')!
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SB_SERVICE_ROLE_KEY')!
     );
 
     const { error: updateError } = await supabaseAdmin
       .from('profiles')
-      .update({ subscription_tier: tier })
+      .update({ 
+        subscription_tier: tier,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', user.id);
 
     if (updateError) {
@@ -76,10 +88,13 @@ export const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // PLACEHOLDER: Return mock Stripe checkout URL
+    console.log('Successfully updated user subscription to:', tier);
+
+    // Mock Stripe checkout URL for demonstration
     const mockCheckoutUrl = `https://checkout.stripe.com/mock?user=${user.id}&tier=${tier}`;
 
     return new Response(JSON.stringify({ 
+      success: true,
       message: 'Subscription initiated (PLACEHOLDER)',
       checkout_url: mockCheckoutUrl,
       tier,
@@ -89,7 +104,10 @@ export const handler = async (req: Request): Promise<Response> => {
     });
   } catch (error) {
     console.error('Subscribe error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
