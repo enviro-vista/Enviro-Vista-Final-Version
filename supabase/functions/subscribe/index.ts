@@ -56,22 +56,8 @@ serve(async (req) => {
     const body = await req.json();
     const { tier = "premium" } = body;
 
-    // Update user subscription
-    const { error: updateError } = await supabaseAdmin
-      .from("profiles")
-      .update({ 
-        subscription_tier: tier,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", user.id);
-
-    if (updateError) {
-      console.error("Error updating subscription:", updateError);
-      return new Response(JSON.stringify({ error: "Failed to update subscription" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
-    }
+    // Note: Don't update subscription until payment is actually completed
+    // This should be done via webhook or payment verification
 
     // Mock Stripe checkout URL for demonstration
     const mockCheckoutUrl = `https://checkout.stripe.com/mock?user=${user.id}&tier=${tier}`;
