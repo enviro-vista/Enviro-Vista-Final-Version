@@ -60,23 +60,23 @@ const Admin = () => {
 
   const checkAdminStatus = async () => {
     if (!user) return;
-    
+
     try {
       // Check if user is admin
       const { data: isAdminData, error: adminError } = await supabase.rpc('is_admin');
       if (adminError) throw adminError;
-      
+
       // Check how many admins exist
       const { count, error: countError } = await supabase
         .from('profiles')
         .select('*', { count: 'exact' })
         .eq('is_admin', true);
-      
+
       if (countError) throw countError;
-      
+
       setAdminCount(count || 0);
       setIsAdmin(!!isAdminData);
-      
+
       // If no admins exist, enable setup mode
       if (count === 0) {
         setSetupMode(true);
@@ -119,12 +119,12 @@ const Admin = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
+
       const devicesWithOwner = data?.map(device => ({
         ...device,
         owner_email: (device.profiles as any)?.email || 'Unknown'
       })) || [];
-      
+
       setDevices(devicesWithOwner);
     } catch (error) {
       console.error('Error fetching devices:', error);
@@ -144,12 +144,12 @@ const Admin = () => {
         .eq('id', userId);
 
       if (error) throw error;
-      
+
       toast({
         title: "Success",
         description: `User subscription updated to ${tier}.`,
       });
-      
+
       fetchUsers();
     } catch (error) {
       console.error('Error updating user tier:', error);
@@ -169,12 +169,12 @@ const Admin = () => {
         .eq('id', deviceId);
 
       if (error) throw error;
-      
+
       toast({
         title: "Success",
         description: "Device deleted successfully.",
       });
-      
+
       fetchDevices();
     } catch (error) {
       console.error('Error deleting device:', error);
@@ -194,12 +194,12 @@ const Admin = () => {
         .eq('id', userId);
 
       if (error) throw error;
-      
+
       toast({
         title: "Success",
         description: "User granted admin privileges.",
       });
-      
+
       fetchUsers();
       checkAdminStatus();
     } catch (error) {
@@ -211,36 +211,36 @@ const Admin = () => {
       });
     }
   };
-
+  // just push
   const handleSetupSubmit = async () => {
     if (!setupPassword) {
       setSetupError("Please enter the setup password");
       return;
     }
-    
+
     if (setupPassword !== ADMIN_SETUP_PASSWORD) {
       setSetupError("Invalid setup password");
       return;
     }
 
     setSetupLoading(true);
-    
+
     try {
       if (!user) throw new Error("User not authenticated");
-      
+
       // Make current user admin
       const { error } = await supabase
         .from('profiles')
         .update({ is_admin: true } as any)
         .eq('id', user.id);
-      
+
       if (error) throw error;
-      
+
       toast({
         title: "Admin Setup Complete",
         description: "You now have administrator privileges.",
       });
-      
+
       setIsAdmin(true);
       setSetupMode(false);
     } catch (error) {
@@ -294,7 +294,7 @@ const Admin = () => {
                   You need the admin setup password to complete this process
                 </p>
               </div>
-              
+
               <Button
                 className="w-full"
                 onClick={handleSetupSubmit}
@@ -310,7 +310,7 @@ const Admin = () => {
             </div>
           </CardContent>
         </Card>
-        
+
         <div className="mt-6 text-center text-sm text-muted-foreground">
           <p>After setup, you'll have full administrator privileges.</p>
           <p className="mt-2">
@@ -445,10 +445,10 @@ const Admin = () => {
                             <SelectItem value="premium">Premium</SelectItem>
                           </SelectContent>
                         </Select>
-                        
+
                         {!user.is_admin && (
-                          <Button 
-                            variant="secondary" 
+                          <Button
+                            variant="secondary"
                             size="sm"
                             onClick={() => makeAdmin(user.id)}
                           >
@@ -520,7 +520,7 @@ const Admin = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="admin">
           <Card>
             <CardHeader>
@@ -544,7 +544,7 @@ const Admin = () => {
                     ))}
                   </div>
                 </div>
-                
+
                 <div className="border rounded-lg p-4">
                   <h3 className="font-semibold mb-3">Danger Zone</h3>
                   <div className="space-y-4">
@@ -555,7 +555,7 @@ const Admin = () => {
                           Allow admin setup again (requires setup password)
                         </p>
                       </div>
-                      <Button 
+                      <Button
                         variant="outline"
                         onClick={() => setSetupMode(true)}
                       >
