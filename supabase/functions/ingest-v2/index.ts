@@ -24,15 +24,15 @@ function calculateHeatIndex(temp: number, humidity: number): number {
   const c7 = 0.00122874;
   const c8 = 0.00085282;
   const c9 = -0.00000199;
-  
-  const t = temp * 9/5 + 32; // Convert to Fahrenheit
+
+  const t = temp * 9 / 5 + 32; // Convert to Fahrenheit
   const rh = humidity;
-  
-  const hi = c1 + (c2 * t) + (c3 * rh) + (c4 * t * rh) + 
-             (c5 * t * t) + (c6 * rh * rh) + (c7 * t * t * rh) + 
-             (c8 * t * rh * rh) + (c9 * t * t * rh * rh);
-  
-  return (hi - 32) * 5/9; // Convert back to Celsius
+
+  const hi = c1 + (c2 * t) + (c3 * rh) + (c4 * t * rh) +
+    (c5 * t * t) + (c6 * rh * rh) + (c7 * t * t * rh) +
+    (c8 * t * rh * rh) + (c9 * t * t * rh * rh);
+
+  return (hi - 32) * 5 / 9; // Convert back to Celsius
 }
 
 function calculateVPD(temp: number, humidity: number): number {
@@ -98,7 +98,7 @@ export const handler = async (req: Request): Promise<Response> => {
     }
 
     const token = authHeader.split(' ')[1];
-    const secretEnv = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const secretEnv = Deno.env.get('SB_SERVICE_ROLE_KEY');
     if (!secretEnv) {
       return new Response(JSON.stringify({ error: 'Server not configured' }), {
         status: 500,
@@ -116,7 +116,7 @@ export const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseUrl = Deno.env.get('SB_URL')!;
     const serviceKey = secretEnv;
     const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 

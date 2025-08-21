@@ -38,7 +38,7 @@ export const handler = async (req: Request): Promise<Response> => {
     }
 
     const token = authHeader.split(' ')[1];
-    const secretEnv = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const secretEnv = Deno.env.get('SB_SERVICE_ROLE_KEY');
     if (!secretEnv) {
       return new Response(JSON.stringify({ error: 'Server not configured' }), {
         status: 500,
@@ -60,7 +60,7 @@ export const handler = async (req: Request): Promise<Response> => {
     // Calculate dew point using provided formula
     const dew_point = temperature - ((100 - humidity) / 5);
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseUrl = Deno.env.get('SB_URL')!;
     const serviceKey = secretEnv; // Use service role for DB ops
     const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 

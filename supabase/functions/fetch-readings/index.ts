@@ -31,8 +31,8 @@ export const handler = async (req: Request): Promise<Response> => {
     const timeRange = url.searchParams.get('time_range') || '24h';
     const limit = parseInt(url.searchParams.get('limit') || '100');
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseUrl = Deno.env.get('SB_URL')!;
+    const supabaseKey = Deno.env.get('SB_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -48,7 +48,7 @@ export const handler = async (req: Request): Promise<Response> => {
     // Calculate time range
     const now = new Date();
     let startTime = new Date();
-    
+
     switch (timeRange) {
       case '24h':
         startTime.setHours(now.getHours() - 24);
