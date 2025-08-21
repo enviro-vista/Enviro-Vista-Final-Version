@@ -211,7 +211,7 @@ const Admin = () => {
       });
     }
   };
-  // just push
+  // just pushng the subscribe function here for context
   const handleSetupSubmit = async () => {
     if (!setupPassword) {
       setSetupError("Please enter the setup password");
