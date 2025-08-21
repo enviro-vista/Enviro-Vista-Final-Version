@@ -27,9 +27,9 @@ serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
+    const supabaseUrl = Deno.env.get("SB_URL");
+    const serviceRoleKey = Deno.env.get("SB_SERVICE_ROLE_KEY");
+
     if (!supabaseUrl || !serviceRoleKey) {
       return new Response(JSON.stringify({ error: "Server configuration error" }), {
         status: 500,
@@ -38,7 +38,7 @@ serve(async (req) => {
     }
 
     // Create client for authentication
-    const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") || "", {
+    const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SB_ANON_KEY") || "", {
       global: { headers: { Authorization: authHeader } },
     });
 
@@ -62,7 +62,7 @@ serve(async (req) => {
     // Mock Stripe checkout URL for demonstration
     const mockCheckoutUrl = `https://checkout.stripe.com/mock?user=${user.id}&tier=${tier}`;
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       success: true,
       message: "Subscription initiated",
       checkout_url: mockCheckoutUrl,
@@ -73,7 +73,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Subscribe error:", error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: "Internal server error",
       details: error instanceof Error ? error.message : "Unknown error"
     }), {
