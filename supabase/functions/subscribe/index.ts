@@ -56,15 +56,10 @@ serve(async (req) => {
 
     // Initialize Stripe
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    console.log("Stripe key details:");
-    console.log("- Raw value:", stripeKey);
-    console.log("- Type:", typeof stripeKey);
-    console.log("- Length:", stripeKey?.length);
-    console.log("- Truthy:", !!stripeKey);
     
     if (!stripeKey || stripeKey.trim() === '') {
-      console.error("STRIPE_SECRET_KEY is empty or not found");
-      return new Response(JSON.stringify({ error: "Stripe not configured - key is empty" }), {
+      console.error("STRIPE_SECRET_KEY is not configured");
+      return new Response(JSON.stringify({ error: "Stripe secret key not configured" }), {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
