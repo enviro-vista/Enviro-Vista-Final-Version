@@ -51,15 +51,18 @@ serve(async (req) => {
       });
     }
 
-    // Create admin client for database operations
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-
-    // Initialize Stripe
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    
-    if (!stripeKey || stripeKey.trim() === '') {
-      console.error("STRIPE_SECRET_KEY is not configured");
-      return new Response(JSON.stringify({ error: "Stripe secret key not configured" }), {
+    // Get Stripe key - try multiple possible environment variable names
+    let stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) {
+      // Log all available env vars for debugging
+      const allEnvVars = Deno.env.toObject();
+      console.log("All env vars:", Object.keys(allEnvVars));
+      console.log("Stripe key found:", !!stripeKey);
+      
+      return new Response(JSON.stringify({ 
+        error: "Stripe secret key not found in environment variables",
+        debug: Object.keys(allEnvVars)
+      }), {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
