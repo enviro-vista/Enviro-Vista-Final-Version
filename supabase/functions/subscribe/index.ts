@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import Stripe from "https://esm.sh/stripe@14.21.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,11 +28,26 @@ serve(async (req) => {
       });
     }
 
+    // Get environment variables
     const supabaseUrl = Deno.env.get("SB_URL");
     const serviceRoleKey = Deno.env.get("SB_SERVICE_ROLE_KEY");
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+
+    console.log("Environment check:");
+    console.log("- Supabase URL:", !!supabaseUrl);
+    console.log("- Service role key:", !!serviceRoleKey);
+    console.log("- Stripe key:", !!stripeKey);
+    console.log("- Stripe key length:", stripeKey?.length || 0);
 
     if (!supabaseUrl || !serviceRoleKey) {
       return new Response(JSON.stringify({ error: "Server configuration error" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    if (!stripeKey) {
+      return new Response(JSON.stringify({ error: "Stripe secret key not configured" }), {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
@@ -50,30 +66,61 @@ serve(async (req) => {
       });
     }
 
-    // Create admin client for database operations
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+    console.log("User authenticated:", user.email);
+
+    // Initialize Stripe
+    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
     const body = await req.json();
     const { tier = "premium" } = body;
 
-    // Update user's subscription tier directly
-    const { error: updateError } = await supabaseAdmin
-      .from('profiles')
-      .update({ subscription_tier: tier })
-      .eq('id', user.id);
+    console.log("Creating checkout for tier:", tier);
 
-    if (updateError) {
-      console.error("Database update error:", updateError);
-      return new Response(JSON.stringify({ error: "Failed to update subscription" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+    // Check if customer exists or create new one
+    let customer;
+    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    
+    if (customers.data.length > 0) {
+      customer = customers.data[0];
+      console.log("Found existing customer:", customer.id);
+    } else {
+      customer = await stripe.customers.create({
+        email: user.email,
+        metadata: { user_id: user.id }
       });
+      console.log("Created new customer:", customer.id);
     }
+
+    // Create checkout session
+    const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: "Premium Subscription",
+              description: "Access to premium features and unlimited data"
+            },
+            unit_amount: 999, // $9.99 in cents
+            recurring: {
+              interval: "month"
+            }
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "subscription",
+      success_url: `${req.headers.get("origin") || "http://localhost:3000"}/?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${req.headers.get("origin") || "http://localhost:3000"}/`,
+    });
+
+    console.log("Checkout session created:", session.id);
 
     return new Response(JSON.stringify({
       success: true,
-      message: "Subscription upgraded successfully",
-      checkout_url: `${req.headers.get("origin") || "http://localhost:3000"}/`,
+      message: "Subscription initiated",
+      checkout_url: session.url,
       tier,
     }), {
       status: 200,
