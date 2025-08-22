@@ -83,11 +83,11 @@ export const useUpgradeSubscription = () => {
   const { session } = useAuth();
   
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ tier = 'premium', billing = 'monthly' }: { tier?: string; billing?: string } = {}) => {
       if (!session) throw new Error('No session found');
 
       const { data, error } = await supabase.functions.invoke('subscribe', {
-        body: { tier: 'premium' },
+        body: { tier, billing },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },

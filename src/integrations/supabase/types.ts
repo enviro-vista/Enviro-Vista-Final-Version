@@ -149,6 +149,7 @@ export type Database = {
           soil_moisture_percentage: number | null
           temperature: number | null
           timestamp: string
+          uv_index: number | null
           vpd: number | null
           weather_trend: string | null
           wet_bulb_temp: number | null
@@ -178,6 +179,7 @@ export type Database = {
           soil_moisture_percentage?: number | null
           temperature?: number | null
           timestamp?: string
+          uv_index?: number | null
           vpd?: number | null
           weather_trend?: string | null
           wet_bulb_temp?: number | null
@@ -207,6 +209,7 @@ export type Database = {
           soil_moisture_percentage?: number | null
           temperature?: number | null
           timestamp?: string
+          uv_index?: number | null
           vpd?: number | null
           weather_trend?: string | null
           wet_bulb_temp?: number | null

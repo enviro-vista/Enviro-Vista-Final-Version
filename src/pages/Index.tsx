@@ -15,7 +15,8 @@ import {
   WifiOff,
   LogOut,
   Crown,
-  Zap
+  Zap,
+  CreditCard
 } from "lucide-react";
 import MetricCard from "@/components/MetricCard";
 import DeviceCard from "@/components/DeviceCard";
@@ -28,6 +29,7 @@ import { useDevices } from "@/hooks/useDevices";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscriptionStatus, useCheckSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
+import { Link } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -237,6 +239,12 @@ const Index = () => {
               <SubscriptionStatusBadge />
             </div>
             <div className="flex gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/subscription">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  {isPremium ? 'Manage Plan' : 'Upgrade'}
+                </Link>
+              </Button>
               <AddDeviceDialog />
               <Dialog>
                 <DialogTrigger asChild>

@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import SubscriptionPage from "./components/SubscriptionPage";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,12 @@ const AppRoutes = () => {
       <Route path="/" element={
         <ProtectedRoute>
           <Index />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/subscription" element={
+        <ProtectedRoute>
+          <SubscriptionPage />
         </ProtectedRoute>
       } />
       

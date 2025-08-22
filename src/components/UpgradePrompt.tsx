@@ -22,7 +22,7 @@ const UpgradePrompt = ({
   const [isDismissed, setIsDismissed] = useState(false);
 
   const handleUpgrade = () => {
-    upgradeSubscription.mutate();
+    upgradeSubscription.mutate({ tier: 'premium', billing: 'monthly' });
   };
 
   const handleDismiss = () => {
@@ -96,15 +96,15 @@ const UpgradePrompt = ({
         <div className="space-y-2 mb-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <div className="w-1.5 h-1.5 bg-primary rounded-full" />
-            CO₂ readings and air quality monitoring
+            VPD (Vapor Pressure Deficit) monitoring
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <div className="w-1.5 h-1.5 bg-primary rounded-full" />
-            Advanced calculated metrics (VPD, heat index)
+            PAR and UV-index sensors
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <div className="w-1.5 h-1.5 bg-primary rounded-full" />
-            Light sensor data and soil monitoring
+            Weather trend analysis
           </div>
         </div>
         <Button 

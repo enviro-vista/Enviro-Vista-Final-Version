@@ -91,6 +91,27 @@ serve(async (req) => {
       console.log("Created new customer:", customer.id);
     }
 
+    const body = await req.json();
+    const { tier = "premium", billing = "monthly" } = body;
+
+    console.log("Creating checkout for tier:", tier, "billing:", billing);
+
+    // Define pricing based on billing period
+    const prices = {
+      monthly: {
+        amount: 999, // $9.99
+        interval: "month",
+        description: "Billed monthly"
+      },
+      yearly: {
+        amount: 9999, // $99.99
+        interval: "year", 
+        description: "Billed annually (≈$8.33/month)"
+      }
+    };
+
+    const selectedPrice = prices[billing as keyof typeof prices] || prices.monthly;
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
@@ -99,12 +120,12 @@ serve(async (req) => {
           price_data: {
             currency: "usd",
             product_data: {
-              name: "Premium Subscription",
-              description: "Access to premium features and unlimited data"
+              name: `Premium Subscription (${billing === "yearly" ? "Annual" : "Monthly"})`,
+              description: `Access to VPD, PAR, UV-index, and Weather Trend analysis. ${selectedPrice.description}`
             },
-            unit_amount: 999, // $9.99 in cents
+            unit_amount: selectedPrice.amount,
             recurring: {
-              interval: "month"
+              interval: selectedPrice.interval as "month" | "year"
             }
           },
           quantity: 1,
