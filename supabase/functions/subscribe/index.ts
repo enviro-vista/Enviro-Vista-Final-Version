@@ -111,8 +111,10 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${req.headers.get("origin") || "http://localhost:3000"}/?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin") || "http://localhost:3000"}/`,
+      success_url: `${req.headers.get("origin") || "http://localhost:3000"}/?session_id={CHECKOUT_SESSION_ID}&upgrade=success`,
+      cancel_url: `${req.headers.get("origin") || "http://localhost:3000"}/?upgrade=cancelled`,
+      // Note: In production, you'd set up a proper webhook endpoint
+      // For now, we'll handle this via the success URL
     });
 
     console.log("Checkout session created:", session.id);

@@ -27,6 +27,7 @@ import UpgradePrompt from "@/components/UpgradePrompt";
 import { useDevices } from "@/hooks/useDevices";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscriptionStatus, useCheckSubscription } from "@/hooks/useSubscription";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -102,9 +103,52 @@ const Index = () => {
     }
   }, [isFree]);
 
-  // Refresh subscription status
+  // Refresh subscription status and handle payment verification
   useEffect(() => {
-    checkSubscription.mutate();
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    const upgradeStatus = urlParams.get('upgrade');
+
+    if (sessionId && upgradeStatus === 'success') {
+      // Verify payment and upgrade user
+      const verifyPayment = async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('verify-payment', {
+            body: { session_id: sessionId }
+          });
+
+          if (error) {
+            console.error('Payment verification error:', error);
+            toast({
+              title: "Payment Verification Failed",
+              description: "Please contact support if your payment was processed.",
+              variant: "destructive"
+            });
+          } else if (data?.success) {
+            toast({
+              title: "🎉 Welcome to Premium!",
+              description: "Your subscription has been activated successfully.",
+            });
+            // Refresh subscription status
+            checkSubscription.mutate();
+            // Clear URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        } catch (error) {
+          console.error('Payment verification error:', error);
+          toast({
+            title: "Payment Verification Failed", 
+            description: "Please contact support if your payment was processed.",
+            variant: "destructive"
+          });
+        }
+      };
+
+      verifyPayment();
+    } else {
+      // Normal subscription check
+      checkSubscription.mutate();
+    }
   }, []);
 
   const dismissUpgradePrompt = () => {
