@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Zap, ArrowRight, X } from "lucide-react";
 import { useState } from "react";
-import { useUpgradeSubscription } from "@/hooks/useSubscription";
+import { Link } from "react-router-dom";
 
 interface UpgradePromptProps {
   title?: string;
@@ -18,12 +18,7 @@ const UpgradePrompt = ({
   compact = false,
   onDismiss 
 }: UpgradePromptProps) => {
-  const upgradeSubscription = useUpgradeSubscription();
   const [isDismissed, setIsDismissed] = useState(false);
-
-  const handleUpgrade = () => {
-    upgradeSubscription.mutate({ tier: 'premium', billing: 'monthly' });
-  };
 
   const handleDismiss = () => {
     setIsDismissed(true);
@@ -42,12 +37,13 @@ const UpgradePrompt = ({
         <div className="flex items-center gap-2">
           <Button
             size="sm"
-            onClick={handleUpgrade}
-            disabled={upgradeSubscription.isPending}
+            asChild
             className="h-7 px-3 text-xs"
           >
-            Upgrade
-            <ArrowRight className="w-3 h-3 ml-1" />
+            <Link to="/subscription">
+              Upgrade
+              <ArrowRight className="w-3 h-3 ml-1" />
+            </Link>
           </Button>
           {onDismiss && (
             <Button
@@ -108,12 +104,13 @@ const UpgradePrompt = ({
           </div>
         </div>
         <Button 
-          onClick={handleUpgrade}
-          disabled={upgradeSubscription.isPending}
+          asChild
           className="w-full"
         >
-          {upgradeSubscription.isPending ? "Processing..." : "Upgrade to Premium"}
-          <ArrowRight className="w-4 h-4 ml-2" />
+          <Link to="/subscription">
+            Upgrade to Premium
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Link>
         </Button>
       </CardContent>
     </Card>

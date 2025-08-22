@@ -132,7 +132,9 @@ const Index = () => {
               description: "Your subscription has been activated successfully.",
             });
             // Refresh subscription status
-            checkSubscription.mutate();
+            setTimeout(() => {
+              checkSubscription.mutate();
+            }, 1000);
             // Clear URL parameters
             window.history.replaceState({}, document.title, window.location.pathname);
           }
@@ -148,10 +150,21 @@ const Index = () => {
 
       verifyPayment();
     } else {
-      // Normal subscription check
+      // Normal subscription check on page load
       checkSubscription.mutate();
     }
   }, []);
+
+  // Auto-refresh subscription status every 30 seconds for premium users
+  useEffect(() => {
+    if (isPremium) {
+      const interval = setInterval(() => {
+        checkSubscription.mutate();
+      }, 30000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isPremium]);
 
   const dismissUpgradePrompt = () => {
     setShowUpgradePrompt(false);
