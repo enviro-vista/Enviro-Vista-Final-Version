@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           created_at: string | null
           device_id: string
+          device_type: string
           id: string
           name: string
           owner_id: string
@@ -26,6 +27,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           device_id: string
+          device_type?: string
           id?: string
           name: string
           owner_id: string
@@ -34,6 +36,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           device_id?: string
+          device_type?: string
           id?: string
           name?: string
           owner_id?: string

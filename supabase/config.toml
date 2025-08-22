@@ -1,19 +1,1 @@
 project_id = "ihuzpqoevnpwesqagsbv"
-
-[functions.register-device]
-verify_jwt = true
-
-[functions.ingest]
-verify_jwt = false
-
-[functions.ingest-v2]
-verify_jwt = false
-
-[functions.subscribe]
-verify_jwt = true
-
-[functions.check-subscription]
-verify_jwt = true
-
-[functions.fetch-readings]
-verify_jwt = true
