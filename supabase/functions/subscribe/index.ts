@@ -72,9 +72,9 @@ serve(async (req) => {
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
     const body = await req.json();
-    const { tier = "premium" } = body;
+    const { tier = "premium", billing = "monthly" } = body;
 
-    console.log("Creating checkout for tier:", tier);
+    console.log("Creating checkout for tier:", tier, "billing:", billing);
 
     // Check if customer exists or create new one
     let customer;
@@ -90,11 +90,6 @@ serve(async (req) => {
       });
       console.log("Created new customer:", customer.id);
     }
-
-    const body = await req.json();
-    const { tier = "premium", billing = "monthly" } = body;
-
-    console.log("Creating checkout for tier:", tier, "billing:", billing);
 
     // Define pricing based on billing period
     const prices = {
