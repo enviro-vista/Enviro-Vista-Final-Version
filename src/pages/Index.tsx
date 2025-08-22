@@ -16,7 +16,8 @@ import {
   LogOut,
   Crown,
   Zap,
-  CreditCard
+  CreditCard,
+  User
 } from "lucide-react";
 import MetricCard from "@/components/MetricCard";
 import DeviceCard from "@/components/DeviceCard";
@@ -129,12 +130,15 @@ const Index = () => {
           } else if (data?.success) {
             toast({
               title: "🎉 Welcome to Premium!",
-              description: "Your subscription has been activated successfully.",
+              description: "Your subscription has been activated successfully. Page will refresh in 3 seconds...",
             });
-            // Refresh subscription status
+            // Refresh subscription status and then reload page
             setTimeout(() => {
               checkSubscription.mutate();
-            }, 1000);
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
+            }, 2000);
             // Clear URL parameters
             window.history.replaceState({}, document.title, window.location.pathname);
           }
@@ -255,7 +259,13 @@ const Index = () => {
               <Button variant="outline" size="sm" asChild>
                 <Link to="/subscription">
                   <CreditCard className="h-4 w-4 mr-2" />
-                  {isPremium ? 'Manage Plan' : 'Upgrade'}
+                  {isPremium ? 'Upgrade' : 'Upgrade'}
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/billing">
+                  <User className="h-4 w-4 mr-2" />
+                  Billing
                 </Link>
               </Button>
               <AddDeviceDialog />

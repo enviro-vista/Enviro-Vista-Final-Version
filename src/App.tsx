@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import SubscriptionPage from "./components/SubscriptionPage";
+import BillingPage from "./components/BillingPage";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +62,12 @@ const AppRoutes = () => {
       <Route path="/subscription" element={
         <ProtectedRoute>
           <SubscriptionPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/billing" element={
+        <ProtectedRoute>
+          <BillingPage />
         </ProtectedRoute>
       } />
       
