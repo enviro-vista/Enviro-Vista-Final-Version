@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import Stripe from "https://esm.sh/stripe@14.21.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,69 +50,30 @@ serve(async (req) => {
       });
     }
 
-    // Get Stripe key - try multiple possible environment variable names
-    let stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) {
-      // Log all available env vars for debugging
-      const allEnvVars = Deno.env.toObject();
-      console.log("All env vars:", Object.keys(allEnvVars));
-      console.log("Stripe key found:", !!stripeKey);
-      
-      return new Response(JSON.stringify({ 
-        error: "Stripe secret key not found in environment variables",
-        debug: Object.keys(allEnvVars)
-      }), {
+    // Create admin client for database operations
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+    const body = await req.json();
+    const { tier = "premium" } = body;
+
+    // Update user's subscription tier directly
+    const { error: updateError } = await supabaseAdmin
+      .from('profiles')
+      .update({ subscription_tier: tier })
+      .eq('id', user.id);
+
+    if (updateError) {
+      console.error("Database update error:", updateError);
+      return new Response(JSON.stringify({ error: "Failed to update subscription" }), {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
-
-    const body = await req.json();
-    const { tier = "premium" } = body;
-
-    // Check if customer exists or create new one
-    let customer;
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    
-    if (customers.data.length > 0) {
-      customer = customers.data[0];
-    } else {
-      customer = await stripe.customers.create({
-        email: user.email,
-        metadata: { user_id: user.id }
-      });
-    }
-
-    // Create checkout session
-    const session = await stripe.checkout.sessions.create({
-      customer: customer.id,
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: "Premium Subscription",
-              description: "Access to premium features and unlimited data"
-            },
-            unit_amount: 999, // $9.99 in cents
-            recurring: {
-              interval: "month"
-            }
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "subscription",
-      success_url: `${req.headers.get("origin") || "http://localhost:3000"}/`,
-      cancel_url: `${req.headers.get("origin") || "http://localhost:3000"}/`,
-    });
-
     return new Response(JSON.stringify({
       success: true,
-      message: "Subscription initiated",
-      checkout_url: session.url,
+      message: "Subscription upgraded successfully",
+      checkout_url: `${req.headers.get("origin") || "http://localhost:3000"}/`,
       tier,
     }), {
       status: 200,
