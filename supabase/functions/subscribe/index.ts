@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import Stripe from "https://esm.sh/stripe@14.21.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -53,19 +54,61 @@ serve(async (req) => {
     // Create admin client for database operations
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
+    // Initialize Stripe
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) {
+      return new Response(JSON.stringify({ error: "Stripe not configured" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+
     const body = await req.json();
     const { tier = "premium" } = body;
 
-    // Note: Don't update subscription until payment is actually completed
-    // This should be done via webhook or payment verification
+    // Check if customer exists or create new one
+    let customer;
+    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    
+    if (customers.data.length > 0) {
+      customer = customers.data[0];
+    } else {
+      customer = await stripe.customers.create({
+        email: user.email,
+        metadata: { user_id: user.id }
+      });
+    }
 
-    // Mock Stripe checkout URL for demonstration
-    const mockCheckoutUrl = `https://checkout.stripe.com/mock?user=${user.id}&tier=${tier}`;
+    // Create checkout session
+    const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: "Premium Subscription",
+              description: "Access to premium features and unlimited data"
+            },
+            unit_amount: 999, // $9.99 in cents
+            recurring: {
+              interval: "month"
+            }
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "subscription",
+      success_url: `${req.headers.get("origin") || "http://localhost:3000"}/`,
+      cancel_url: `${req.headers.get("origin") || "http://localhost:3000"}/`,
+    });
 
     return new Response(JSON.stringify({
       success: true,
       message: "Subscription initiated",
-      checkout_url: mockCheckoutUrl,
+      checkout_url: session.url,
       tier,
     }), {
       status: 200,
