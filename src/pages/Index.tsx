@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense, lazy } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,15 +13,9 @@ import {
   Wifi,
   WifiOff,
   LogOut,
-  Crown,
-  Zap,
   CreditCard,
   User
 } from "lucide-react";
-import MetricCard from "@/components/MetricCard";
-import DeviceCard from "@/components/DeviceCard";
-import ChartView from "@/components/ChartView";
-import AddDeviceDialog from "@/components/AddDeviceDialog";
 import Header from "@/components/Header";
 import SubscriptionStatusBadge from "@/components/SubscriptionStatusBadge";
 import UpgradePrompt from "@/components/UpgradePrompt";
@@ -42,6 +36,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 
+// Lazy load heavy components
+const MetricCard = lazy(() => import("@/components/MetricCard"));
+const DeviceCard = lazy(() => import("@/components/DeviceCard"));
+const ChartView = lazy(() => import("@/components/ChartView"));
+const AddDeviceDialog = lazy(() => import("@/components/AddDeviceDialog"));
+
 const Index = () => {
   const [activeView, setActiveView] = useState<'grid' | 'chart'>('grid');
   const [selectedDevice, setSelectedDevice] = useState<string>('all');
@@ -50,45 +50,64 @@ const Index = () => {
   const { signOut } = useAuth();
   const { isPremium, isFree } = useSubscriptionStatus();
   const checkSubscription = useCheckSubscription();
-  const [liveMonitoring, setLiveMonitoring] = useState<boolean>(() => JSON.parse(localStorage.getItem("settings.liveMonitoring") ?? "true"));
-  const [alertsEnabled, setAlertsEnabled] = useState<boolean>(() => JSON.parse(localStorage.getItem("settings.alertsEnabled") ?? "true"));
+  
+  // Initialize state safely for SSR/SSG
+  const [liveMonitoring, setLiveMonitoring] = useState(true);
+  const [alertsEnabled, setAlertsEnabled] = useState(true);
+  
+  // Initialize state after component mounts (client-side only)
+  useEffect(() => {
+    setLiveMonitoring(JSON.parse(localStorage.getItem("settings.liveMonitoring") ?? "true"));
+    setAlertsEnabled(JSON.parse(localStorage.getItem("settings.alertsEnabled") ?? "true"));
+  }, []);
 
-  // Calculate average metrics from all devices
-  const averageMetrics = devices.length > 0 ? {
-    temperature: devices
-      .filter(device => device.latest_reading)
-      .reduce((sum, device) => sum + (device.latest_reading?.temperature || 0), 0) / 
-      devices.filter(device => device.latest_reading).length,
-    humidity: devices
-      .filter(device => device.latest_reading)
-      .reduce((sum, device) => sum + (device.latest_reading?.humidity || 0), 0) / 
-      devices.filter(device => device.latest_reading).length,
-    pressure: devices
-      .filter(device => device.latest_reading)
-      .reduce((sum, device) => sum + (device.latest_reading?.pressure || 0), 0) / 
-      devices.filter(device => device.latest_reading).length,
-    dewPoint: devices
-      .filter(device => device.latest_reading)
-      .reduce((sum, device) => sum + (device.latest_reading?.dew_point || 0), 0) / 
-      devices.filter(device => device.latest_reading).length,
-  } : {
-    temperature: 0,
-    humidity: 0,
-    pressure: 0,
-    dewPoint: 0,
-  };
+  // Memoized calculation of average metrics
+  const averageMetrics = useMemo(() => {
+    if (devices.length === 0) {
+      return {
+        temperature: 0,
+        humidity: 0,
+        pressure: 0,
+        dewPoint: 0,
+      };
+    }
 
-  const onlineDevices = devices.filter(device => {
-    if (!device.latest_reading) return false;
-    const lastReading = new Date(device.latest_reading.timestamp);
-    const now = new Date();
-    const hoursDiff = (now.getTime() - lastReading.getTime()) / (1000 * 60 * 60);
-    return hoursDiff <= 2; // Consider online if last reading was within 2 hours
-  }).length;
+    const devicesWithReadings = devices.filter(device => device.latest_reading);
+    if (devicesWithReadings.length === 0) {
+      return {
+        temperature: 0,
+        humidity: 0,
+        pressure: 0,
+        dewPoint: 0,
+      };
+    }
 
-  const handleSignOut = async () => {
+    return {
+      temperature: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.temperature || 0), 0) / devicesWithReadings.length,
+      humidity: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.humidity || 0), 0) / devicesWithReadings.length,
+      pressure: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.pressure || 0), 0) / devicesWithReadings.length,
+      dewPoint: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.dew_point || 0), 0) / devicesWithReadings.length,
+    };
+  }, [devices]);
+
+  // Memoized calculation of online devices
+  const onlineDevices = useMemo(() => {
+    return devices.filter(device => {
+      if (!device.latest_reading) return false;
+      try {
+        const lastReading = new Date(device.latest_reading.timestamp);
+        const now = new Date();
+        const hoursDiff = (now.getTime() - lastReading.getTime()) / (1000 * 60 * 60);
+        return hoursDiff <= 2; // Consider online if last reading was within 2 hours
+      } catch (e) {
+        return false;
+      }
+    }).length;
+  }, [devices]);
+
+  const handleSignOut = useCallback(async () => {
     await signOut();
-  };
+  }, [signOut]);
 
   // Show upgrade prompt for free users periodically and on first load
   useEffect(() => {
@@ -169,13 +188,13 @@ const Index = () => {
     }
   }, [isPremium]);
 
-  const dismissUpgradePrompt = () => {
+  const dismissUpgradePrompt = useCallback(() => {
     setShowUpgradePrompt(false);
     // Don't show again for 10 minutes
     setTimeout(() => {
       if (isFree) setShowUpgradePrompt(true);
     }, 10 * 60 * 1000);
-  };
+  }, [isFree]);
 
   if (isLoading) {
     return (
@@ -192,7 +211,7 @@ const Index = () => {
     <div className="min-h-screen">
       <Header />
       
-      <main className="container mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto px-3 py-4 space-y-4">
         
         {/* Upgrade Prompt for Free Users */}
         {isFree && showUpgradePrompt && (
@@ -204,99 +223,115 @@ const Index = () => {
             />
           </div>
         )}
-        {/* Overview Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            title="Temperature"
-            value={averageMetrics.temperature.toFixed(1)}
-            unit="°C"
-            icon={Thermometer}
-            gradient="temp-gradient"
-            trend={devices.length > 0 ? "+0.5°C" : "No data"}
-          />
-          <MetricCard
-            title="Humidity"
-            value={averageMetrics.humidity.toFixed(1)}
-            unit="%"
-            icon={Droplets}
-            gradient="humidity-gradient"
-            trend={devices.length > 0 ? "-2.1%" : "No data"}
-          />
-          <MetricCard
-            title="Pressure"
-            value={averageMetrics.pressure.toFixed(0)}
-            unit="hPa"
-            icon={Gauge}
-            gradient="pressure-gradient"
-            trend={devices.length > 0 ? "+1.2 hPa" : "No data"}
-          />
-          <MetricCard
-            title="Dew Point"
-            value={averageMetrics.dewPoint.toFixed(1)}
-            unit="°C"
-            icon={Cloud}
-            gradient="dewpoint-gradient"
-            trend={devices.length > 0 ? "+0.3°C" : "No data"}
-          />
+        
+        {/* Overview Cards - Adjusted for mobile */}
+        <div className="grid grid-cols-2 gap-3">
+          <Suspense fallback={<div className="bg-muted rounded-lg h-24 animate-pulse"></div>}>
+            <MetricCard
+              title="Temp"
+              value={averageMetrics.temperature.toFixed(1)}
+              unit="°C"
+              icon={Thermometer}
+              gradient="temp-gradient"
+              trend={devices.length > 0 ? "+0.5°C" : "No data"}
+              compact
+            />
+          </Suspense>
+          <Suspense fallback={<div className="bg-muted rounded-lg h-24 animate-pulse"></div>}>
+            <MetricCard
+              title="Humidity"
+              value={averageMetrics.humidity.toFixed(1)}
+              unit="%"
+              icon={Droplets}
+              gradient="humidity-gradient"
+              trend={devices.length > 0 ? "-2.1%" : "No data"}
+              compact
+            />
+          </Suspense>
+          <Suspense fallback={<div className="bg-muted rounded-lg h-24 animate-pulse"></div>}>
+            <MetricCard
+              title="Pressure"
+              value={averageMetrics.pressure.toFixed(0)}
+              unit="hPa"
+              icon={Gauge}
+              gradient="pressure-gradient"
+              trend={devices.length > 0 ? "+1.2 hPa" : "No data"}
+              compact
+            />
+          </Suspense>
+          <Suspense fallback={<div className="bg-muted rounded-lg h-24 animate-pulse"></div>}>
+            <MetricCard
+              title="Dew Point"
+              value={averageMetrics.dewPoint.toFixed(1)}
+              unit="°C"
+              icon={Cloud}
+              gradient="dewpoint-gradient"
+              trend={devices.length > 0 ? "+0.3°C" : "No data"}
+              compact
+            />
+          </Suspense>
         </div>
 
-        {/* Status Summary */}
-        <Card className="glass-card p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+        {/* Status Summary - Adjusted for mobile */}
+        <Card className="glass-card p-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
-                <Wifi className="h-5 w-5 text-success" />
+                <Wifi className="h-4 w-4 text-success" />
                 <span className="text-sm font-medium">{onlineDevices} Online</span>
               </div>
               <div className="flex items-center gap-2">
-                <WifiOff className="h-5 w-5 text-muted-foreground" />
+                <WifiOff className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">{devices.length - onlineDevices} Offline</span>
               </div>
               <SubscriptionStatusBadge />
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" asChild>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" asChild className="flex-1 min-w-[120px]">
                 <Link to="/subscription">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  {isPremium ? 'Upgrade' : 'Upgrade'}
+                  <CreditCard className="h-3 w-3 mr-1" />
+                  {isPremium ? 'Manage' : 'Upgrade'}
                 </Link>
               </Button>
-              <Button variant="outline" size="sm" asChild>
+              <Button variant="outline" size="sm" asChild className="flex-1 min-w-[100px]">
                 <Link to="/billing">
-                  <User className="h-4 w-4 mr-2" />
+                  <User className="h-3 w-3 mr-1" />
                   Billing
                 </Link>
               </Button>
-              <AddDeviceDialog />
+              <Suspense fallback={<Button variant="outline" size="sm" disabled>Add Device</Button>}>
+                <AddDeviceDialog />
+              </Suspense>
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" aria-label="Settings">
+                  <Button variant="outline" size="sm" aria-label="Settings" className="px-3">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="w-[90vw] max-w-md mx-auto rounded-lg">
                   <DialogHeader>
                     <DialogTitle>Settings</DialogTitle>
                     <DialogDescription>Configure your dashboard preferences.</DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-4">
+                  <div className="space-y-4 py-2">
                     <div className="flex items-center justify-between">
-                      <div>
+                      <div className="flex-1 mr-4">
                         <p className="text-sm font-medium">Live monitoring</p>
                         <p className="text-xs text-muted-foreground">Update dashboard in real time.</p>
                       </div>
                       <Switch checked={liveMonitoring} onCheckedChange={setLiveMonitoring} />
                     </div>
                     <div className="flex items-center justify-between">
-                      <div>
+                      <div className="flex-1 mr-4">
                         <p className="text-sm font-medium">Notifications</p>
                         <p className="text-xs text-muted-foreground">Enable alert popovers.</p>
                       </div>
                       <Switch checked={alertsEnabled} onCheckedChange={setAlertsEnabled} />
                     </div>
                   </div>
-                  <DialogFooter>
+                  <DialogFooter className="sm:justify-start">
                     <Button
+                      className="w-full"
                       onClick={() => {
                         try {
                           localStorage.setItem("settings.liveMonitoring", JSON.stringify(liveMonitoring));
@@ -307,29 +342,29 @@ const Index = () => {
                         }
                       }}
                     >
-                      Save
+                      Save Settings
                     </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
+              <Button variant="outline" size="sm" onClick={handleSignOut} className="px-3">
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </Card>
 
-        {/* View Toggle */}
+        {/* View Toggle - Adjusted for mobile */}
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold tracking-tight">Your Devices</h2>
+          <h2 className="text-xl font-bold tracking-tight">Your Devices</h2>
           <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'grid' | 'chart')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="grid" className="flex items-center gap-2">
-                <Grid3X3 className="h-4 w-4" />
+            <TabsList className="h-9">
+              <TabsTrigger value="grid" className="text-xs px-3">
+                <Grid3X3 className="h-3 w-3 mr-1" />
                 Grid
               </TabsTrigger>
-              <TabsTrigger value="chart" className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
+              <TabsTrigger value="chart" className="text-xs px-3">
+                <BarChart3 className="h-3 w-3 mr-1" />
                 Charts
               </TabsTrigger>
             </TabsList>
@@ -338,7 +373,7 @@ const Index = () => {
 
         {/* Main Content */}
         {activeView === 'grid' ? (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Inline upgrade prompt in data section for free users */}
             {isFree && (
               <UpgradePrompt 
@@ -349,21 +384,29 @@ const Index = () => {
               />
             )}
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-4">
               {devices.length > 0 ? (
                 devices.map((device) => (
-                  <DeviceCard key={device.id} device={device} onDeviceUpdated={() => {}} />
+                  <Suspense key={device.id} fallback={<div className="bg-muted rounded-lg h-40 animate-pulse"></div>}>
+                    <DeviceCard device={device} onDeviceUpdated={() => {}} />
+                  </Suspense>
                 ))
               ) : (
-              <div className="col-span-full text-center py-12">
+              <div className="col-span-full text-center py-8">
                 <p className="text-muted-foreground mb-4">No devices found. Add your first device to get started!</p>
-                <AddDeviceDialog />
+                <Suspense fallback={<Button variant="default" disabled>Add Device</Button>}>
+                  <AddDeviceDialog />
+                </Suspense>
               </div>
             )}
             </div>
           </div>
         ) : (
-          <ChartView devices={devices} selectedDevice={selectedDevice} />
+          <div className="overflow-hidden">
+            <Suspense fallback={<div className="bg-muted rounded-lg h-64 animate-pulse"></div>}>
+              <ChartView devices={devices} selectedDevice={selectedDevice} />
+            </Suspense>
+          </div>
         )}
       </main>
     </div>
