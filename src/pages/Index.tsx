@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -50,62 +50,45 @@ const Index = () => {
   const { signOut } = useAuth();
   const { isPremium, isFree } = useSubscriptionStatus();
   const checkSubscription = useCheckSubscription();
-  const [liveMonitoring, setLiveMonitoring] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return JSON.parse(localStorage.getItem("settings.liveMonitoring") ?? "true");
-    }
-    return true;
-  });
-  const [alertsEnabled, setAlertsEnabled] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return JSON.parse(localStorage.getItem("settings.alertsEnabled") ?? "true");
-    }
-    return true;
-  });
+  const [liveMonitoring, setLiveMonitoring] = useState<boolean>(() => JSON.parse(localStorage.getItem("settings.liveMonitoring") ?? "true"));
+  const [alertsEnabled, setAlertsEnabled] = useState<boolean>(() => JSON.parse(localStorage.getItem("settings.alertsEnabled") ?? "true"));
 
-  // Memoized calculation of average metrics
-  const averageMetrics = useMemo(() => {
-    if (devices.length === 0) {
-      return {
-        temperature: 0,
-        humidity: 0,
-        pressure: 0,
-        dewPoint: 0,
-      };
-    }
+  // Calculate average metrics from all devices
+  const averageMetrics = devices.length > 0 ? {
+    temperature: devices
+      .filter(device => device.latest_reading)
+      .reduce((sum, device) => sum + (device.latest_reading?.temperature || 0), 0) / 
+      devices.filter(device => device.latest_reading).length,
+    humidity: devices
+      .filter(device => device.latest_reading)
+      .reduce((sum, device) => sum + (device.latest_reading?.humidity || 0), 0) / 
+      devices.filter(device => device.latest_reading).length,
+    pressure: devices
+      .filter(device => device.latest_reading)
+      .reduce((sum, device) => sum + (device.latest_reading?.pressure || 0), 0) / 
+      devices.filter(device => device.latest_reading).length,
+    dewPoint: devices
+      .filter(device => device.latest_reading)
+      .reduce((sum, device) => sum + (device.latest_reading?.dew_point || 0), 0) / 
+      devices.filter(device => device.latest_reading).length,
+  } : {
+    temperature: 0,
+    humidity: 0,
+    pressure: 0,
+    dewPoint: 0,
+  };
 
-    const devicesWithReadings = devices.filter(device => device.latest_reading);
-    if (devicesWithReadings.length === 0) {
-      return {
-        temperature: 0,
-        humidity: 0,
-        pressure: 0,
-        dewPoint: 0,
-      };
-    }
+  const onlineDevices = devices.filter(device => {
+    if (!device.latest_reading) return false;
+    const lastReading = new Date(device.latest_reading.timestamp);
+    const now = new Date();
+    const hoursDiff = (now.getTime() - lastReading.getTime()) / (1000 * 60 * 60);
+    return hoursDiff <= 2; // Consider online if last reading was within 2 hours
+  }).length;
 
-    return {
-      temperature: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.temperature || 0), 0) / devicesWithReadings.length,
-      humidity: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.humidity || 0), 0) / devicesWithReadings.length,
-      pressure: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.pressure || 0), 0) / devicesWithReadings.length,
-      dewPoint: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.dew_point || 0), 0) / devicesWithReadings.length,
-    };
-  }, [devices]);
-
-  // Memoized calculation of online devices
-  const onlineDevices = useMemo(() => {
-    return devices.filter(device => {
-      if (!device.latest_reading) return false;
-      const lastReading = new Date(device.latest_reading.timestamp);
-      const now = new Date();
-      const hoursDiff = (now.getTime() - lastReading.getTime()) / (1000 * 60 * 60);
-      return hoursDiff <= 2; // Consider online if last reading was within 2 hours
-    }).length;
-  }, [devices]);
-
-  const handleSignOut = useCallback(async () => {
+  const handleSignOut = async () => {
     await signOut();
-  }, [signOut]);
+  };
 
   // Show upgrade prompt for free users periodically and on first load
   useEffect(() => {
@@ -186,13 +169,13 @@ const Index = () => {
     }
   }, [isPremium]);
 
-  const dismissUpgradePrompt = useCallback(() => {
+  const dismissUpgradePrompt = () => {
     setShowUpgradePrompt(false);
     // Don't show again for 10 minutes
     setTimeout(() => {
       if (isFree) setShowUpgradePrompt(true);
     }, 10 * 60 * 1000);
-  }, [isFree]);
+  };
 
   if (isLoading) {
     return (
@@ -209,7 +192,7 @@ const Index = () => {
     <div className="min-h-screen">
       <Header />
       
-      <main className="container mx-auto px-3 py-4 space-y-4">
+      <main className="container mx-auto px-4 py-6 space-y-6">
         
         {/* Upgrade Prompt for Free Users */}
         {isFree && showUpgradePrompt && (
@@ -221,17 +204,15 @@ const Index = () => {
             />
           </div>
         )}
-        
-        {/* Overview Cards - Adjusted for mobile */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Overview Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
-            title="Temp"
+            title="Temperature"
             value={averageMetrics.temperature.toFixed(1)}
             unit="°C"
             icon={Thermometer}
             gradient="temp-gradient"
             trend={devices.length > 0 ? "+0.5°C" : "No data"}
-            compact
           />
           <MetricCard
             title="Humidity"
@@ -240,7 +221,6 @@ const Index = () => {
             icon={Droplets}
             gradient="humidity-gradient"
             trend={devices.length > 0 ? "-2.1%" : "No data"}
-            compact
           />
           <MetricCard
             title="Pressure"
@@ -249,7 +229,6 @@ const Index = () => {
             icon={Gauge}
             gradient="pressure-gradient"
             trend={devices.length > 0 ? "+1.2 hPa" : "No data"}
-            compact
           />
           <MetricCard
             title="Dew Point"
@@ -258,68 +237,66 @@ const Index = () => {
             icon={Cloud}
             gradient="dewpoint-gradient"
             trend={devices.length > 0 ? "+0.3°C" : "No data"}
-            compact
           />
         </div>
 
-        {/* Status Summary - Adjusted for mobile */}
-        <Card className="glass-card p-4">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-3">
+        {/* Status Summary */}
+        <Card className="glass-card p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <Wifi className="h-4 w-4 text-success" />
+                <Wifi className="h-5 w-5 text-success" />
                 <span className="text-sm font-medium">{onlineDevices} Online</span>
               </div>
               <div className="flex items-center gap-2">
-                <WifiOff className="h-4 w-4 text-muted-foreground" />
+                <WifiOff className="h-5 w-5 text-muted-foreground" />
                 <span className="text-sm font-medium">{devices.length - onlineDevices} Offline</span>
               </div>
               <SubscriptionStatusBadge />
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" asChild className="flex-1 min-w-[120px]">
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" asChild>
                 <Link to="/subscription">
-                  <CreditCard className="h-3 w-3 mr-1" />
-                  {isPremium ? 'Manage' : 'Upgrade'}
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  {isPremium ? 'Upgrade' : 'Upgrade'}
                 </Link>
               </Button>
-              <Button variant="outline" size="sm" asChild className="flex-1 min-w-[100px]">
+              <Button variant="outline" size="sm" asChild>
                 <Link to="/billing">
-                  <User className="h-3 w-3 mr-1" />
+                  <User className="h-4 w-4 mr-2" />
                   Billing
                 </Link>
               </Button>
               <AddDeviceDialog />
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" aria-label="Settings" className="px-3">
+                  <Button variant="outline" size="sm" aria-label="Settings">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="w-[90vw] max-w-md mx-auto rounded-lg">
+                <DialogContent className="sm:max-w-md">
                   <DialogHeader>
                     <DialogTitle>Settings</DialogTitle>
                     <DialogDescription>Configure your dashboard preferences.</DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-4 py-2">
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex-1 mr-4">
+                      <div>
                         <p className="text-sm font-medium">Live monitoring</p>
                         <p className="text-xs text-muted-foreground">Update dashboard in real time.</p>
                       </div>
                       <Switch checked={liveMonitoring} onCheckedChange={setLiveMonitoring} />
                     </div>
                     <div className="flex items-center justify-between">
-                      <div className="flex-1 mr-4">
+                      <div>
                         <p className="text-sm font-medium">Notifications</p>
                         <p className="text-xs text-muted-foreground">Enable alert popovers.</p>
                       </div>
                       <Switch checked={alertsEnabled} onCheckedChange={setAlertsEnabled} />
                     </div>
                   </div>
-                  <DialogFooter className="sm:justify-start">
+                  <DialogFooter>
                     <Button
-                      className="w-full"
                       onClick={() => {
                         try {
                           localStorage.setItem("settings.liveMonitoring", JSON.stringify(liveMonitoring));
@@ -330,29 +307,29 @@ const Index = () => {
                         }
                       }}
                     >
-                      Save Settings
+                      Save
                     </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-              <Button variant="outline" size="sm" onClick={handleSignOut} className="px-3">
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </Card>
 
-        {/* View Toggle - Adjusted for mobile */}
+        {/* View Toggle */}
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold tracking-tight">Your Devices</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Your Devices</h2>
           <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'grid' | 'chart')}>
-            <TabsList className="h-9">
-              <TabsTrigger value="grid" className="text-xs px-3">
-                <Grid3X3 className="h-3 w-3 mr-1" />
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="grid" className="flex items-center gap-2">
+                <Grid3X3 className="h-4 w-4" />
                 Grid
               </TabsTrigger>
-              <TabsTrigger value="chart" className="text-xs px-3">
-                <BarChart3 className="h-3 w-3 mr-1" />
+              <TabsTrigger value="chart" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
                 Charts
               </TabsTrigger>
             </TabsList>
@@ -361,7 +338,7 @@ const Index = () => {
 
         {/* Main Content */}
         {activeView === 'grid' ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Inline upgrade prompt in data section for free users */}
             {isFree && (
               <UpgradePrompt 
@@ -372,13 +349,13 @@ const Index = () => {
               />
             )}
             
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {devices.length > 0 ? (
                 devices.map((device) => (
                   <DeviceCard key={device.id} device={device} onDeviceUpdated={() => {}} />
                 ))
               ) : (
-              <div className="col-span-full text-center py-8">
+              <div className="col-span-full text-center py-12">
                 <p className="text-muted-foreground mb-4">No devices found. Add your first device to get started!</p>
                 <AddDeviceDialog />
               </div>
@@ -386,9 +363,7 @@ const Index = () => {
             </div>
           </div>
         ) : (
-          <div className="overflow-hidden">
-            <ChartView devices={devices} selectedDevice={selectedDevice} />
-          </div>
+          <ChartView devices={devices} selectedDevice={selectedDevice} />
         )}
       </main>
     </div>
