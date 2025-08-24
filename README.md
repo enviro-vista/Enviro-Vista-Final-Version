@@ -1,4 +1,4 @@
-# Enviro-Vista
+# Enviro-Vista Alpha
 
 Real-time environmental monitoring dashboard with ESP32 ingestion via Supabase Edge Functions.
 
