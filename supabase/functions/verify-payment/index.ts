@@ -49,6 +49,7 @@ serve(async (req) => {
     // Retrieve the checkout session
     const session = await stripe.checkout.sessions.retrieve(session_id);
     console.log("Session status:", session.payment_status);
+    console.log("Session:", session);
 
     if (session.payment_status !== "paid") {
       return new Response(JSON.stringify({ error: "Payment not completed" }), {
@@ -92,9 +93,63 @@ serve(async (req) => {
       });
     }
 
-    // Update user subscription in database
+    // Store transaction data in stripe_transactions table
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+    
+    try {
+      console.log("Storing transaction data...");
+      
+      // Get subscription details to extract next billing date
+      let nextBillingDate: string | null = null;
+      if (session.subscription) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(session.subscription);
+          nextBillingDate = new Date(subscription.current_period_end * 1000).toISOString();
+          console.log("Next billing date:", nextBillingDate);
+        } catch (subError) {
+          console.error("Error fetching subscription:", subError);
+        }
+      }
+      
+      // Check if transaction already exists to prevent duplicates
+      const { data: existingTransaction } = await supabase
+        .from('stripe_transactions')
+        .select('id')
+        .eq('stripe_session_id', session.id)
+        .single();
+      
+      if (existingTransaction) {
+        console.log("Transaction already exists, skipping duplicate storage");
+      } else {
+        const { error: transactionError } = await supabase
+          .from('stripe_transactions')
+          .insert([{
+            stripe_session_id: session.id,
+            stripe_payment_intent_id: session.payment_intent,
+            customer_email: customer.email,
+            customer_id: session.customer,
+            amount: session.amount_total || 0,
+            currency: session.currency || 'usd',
+            status: session.payment_status,
+            subscription_id: session.subscription,
+            billing_cycle: session.mode === 'subscription' ? 'monthly' : 'one-time',
+            next_billing_date: nextBillingDate,
+            product_name: 'Premium Subscription'
+          }]);
 
+        if (transactionError) {
+          console.error("Error storing transaction:", transactionError);
+          // Continue with subscription update even if transaction storage fails
+        } else {
+          console.log("Transaction stored successfully");
+        }
+      }
+    } catch (error) {
+      console.error("Error in transaction storage:", error);
+      // Continue with subscription update
+    }
+
+    // Update user subscription in database
     const { error: updateError } = await supabase
       .from('profiles')
       .update({ subscription_tier: 'premium' })
@@ -113,7 +168,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       message: "Subscription upgraded successfully",
-      subscription_tier: "premium"
+      subscription_tier: "premium",
+      session: session
     }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },

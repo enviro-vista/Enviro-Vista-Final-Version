@@ -126,18 +126,23 @@ const Index = () => {
 
   // Refresh subscription status and handle payment verification
   useEffect(() => {
+    console.log('🔍 Payment verification useEffect triggered');
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('session_id');
     const upgradeStatus = urlParams.get('upgrade');
+    
+    console.log('🔍 URL params:', { sessionId, upgradeStatus });
 
     if (sessionId && upgradeStatus === 'success') {
+      console.log('🔍 Starting payment verification for session:', sessionId);
       // Verify payment and upgrade user
       const verifyPayment = async () => {
         try {
+          console.log('🔍 Calling verify-payment function...');
           const { data, error } = await supabase.functions.invoke('verify-payment', {
             body: { session_id: sessionId }
           });
-
+          console.log("Data:", data);
           if (error) {
             console.error('Payment verification error:', error);
             toast({
@@ -384,7 +389,7 @@ const Index = () => {
               />
             )}
             
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {devices.length > 0 ? (
                 devices.map((device) => (
                   <Suspense key={device.id} fallback={<div className="bg-muted rounded-lg h-40 animate-pulse"></div>}>

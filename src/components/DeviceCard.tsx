@@ -81,7 +81,12 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
         <div className="flex items-start justify-between mb-4">
           <div className="space-y-1">
             <h3 className="font-semibold tracking-tight">{device.name}</h3>
-            <p className="text-sm text-muted-foreground">{device.device_id}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground">{device.device_id}</p>
+              <Badge variant="secondary" className="text-xs">
+                {device.device_type === 'AIR' ? '🌬️ Air' : '🌱 Soil'}
+              </Badge>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Badge className={isOnline ? "bg-green-500/20 text-green-500" : "bg-red-500/20 text-red-500"}>

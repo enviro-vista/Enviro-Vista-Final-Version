@@ -78,6 +78,47 @@ serve(async (req) => {
 
       const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+      // Store transaction data
+      try {
+        // Get subscription details to extract next billing date
+        let nextBillingDate: string | null = null;
+        if (session.subscription) {
+          try {
+            const subscription = await stripe.subscriptions.retrieve(session.subscription);
+            nextBillingDate = new Date(subscription.current_period_end * 1000).toISOString();
+            console.log("Next billing date:", nextBillingDate);
+          } catch (subError) {
+            console.error("Error fetching subscription:", subError);
+          }
+        }
+
+        const { error: transactionError } = await supabase
+          .from('stripe_transactions')
+          .insert([{
+            stripe_session_id: session.id,
+            stripe_payment_intent_id: session.payment_intent,
+            customer_email: customer.email,
+            customer_id: session.customer,
+            amount: session.amount_total || 0,
+            currency: session.currency || 'usd',
+            status: 'succeeded',
+            subscription_id: session.subscription,
+            billing_cycle: session.mode === 'subscription' ? 'monthly' : 'one-time',
+            next_billing_date: nextBillingDate,
+            product_name: 'Premium Subscription'
+          }]);
+
+        if (transactionError) {
+          console.error("Error storing transaction:", transactionError);
+          // Continue with subscription update even if transaction storage fails
+        } else {
+          console.log("Transaction stored successfully");
+        }
+      } catch (error) {
+        console.error("Error in transaction storage:", error);
+        // Continue with subscription update
+      }
+
       // Find user by email and update subscription
       const { data: profiles, error: findError } = await supabase
         .from('profiles')

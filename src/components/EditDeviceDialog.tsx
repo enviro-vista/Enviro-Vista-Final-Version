@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { useUpdateDevice, Device } from '@/hooks/useDevices';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +22,7 @@ const EditDeviceDialog = ({
   onDeviceUpdated
 }: EditDeviceDialogProps) => {
   const [name, setName] = useState(device.name);
+  const [deviceType, setDeviceType] = useState<'AIR' | 'SOIL'>(device.device_type);
   const updateDevice = useUpdateDevice();
   const { toast } = useToast();
 
@@ -29,12 +31,13 @@ const EditDeviceDialog = ({
     try {
       await updateDevice.mutateAsync({ 
         id: device.id, 
-        name 
+        name,
+        device_type: deviceType
       });
       
       toast({
         title: "Device Updated",
-        description: `"${device.name}" has been renamed to "${name}".`,
+        description: `"${device.name}" has been updated successfully.`,
       });
       
       onDeviceUpdated();
@@ -52,7 +55,7 @@ const EditDeviceDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Rename Device</DialogTitle>
+          <DialogTitle>Edit Device</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -68,6 +71,18 @@ const EditDeviceDialog = ({
               maxLength={50}
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="device-type">Device Type</Label>
+            <Select value={deviceType} onValueChange={(value: 'AIR' | 'SOIL') => setDeviceType(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select device type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="AIR">Air Quality Sensor</SelectItem>
+                <SelectItem value="SOIL">Soil Moisture Sensor</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex justify-end gap-2">
             <Button 
               type="button" 
@@ -78,7 +93,7 @@ const EditDeviceDialog = ({
             </Button>
             <Button 
               type="submit" 
-              disabled={updateDevice.isPending || name.trim() === device.name}
+              disabled={updateDevice.isPending || (name.trim() === device.name && deviceType === device.device_type)}
             >
               {updateDevice.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes

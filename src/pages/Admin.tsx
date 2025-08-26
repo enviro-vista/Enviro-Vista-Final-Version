@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Activity, Shield, Trash2, Lock, Loader2 } from "lucide-react";
+import { useTransactions, useTotalIncome, useMonthlyIncome } from "@/hooks/useTransactions";
+import { Users, Activity, Shield, Trash2, Lock, Loader2, DollarSign, TrendingUp } from "lucide-react";
 
 interface AdminUser {
   id: string;
@@ -31,6 +32,18 @@ interface AdminDevice {
   created_at: string;
 }
 
+interface AdminTransaction {
+  id: string;
+  stripe_session_id: string;
+  customer_email: string;
+  amount: number;
+  currency: string;
+  status: string;
+  billing_cycle: string;
+  product_name: string;
+  created_at: string;
+}
+
 const Admin = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -43,6 +56,11 @@ const Admin = () => {
   const [setupPassword, setSetupPassword] = useState("");
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupError, setSetupError] = useState("");
+
+  // Transaction data hooks
+  const { data: transactions = [] } = useTransactions();
+  const { data: totalIncome = 0 } = useTotalIncome();
+  const { data: monthlyIncome = 0 } = useMonthlyIncome();
 
   // Admin setup password (hardcoded for simplicity - in production use proper auth)
   const ADMIN_SETUP_PASSWORD = "admin123";
@@ -356,7 +374,7 @@ const Admin = () => {
         <p className="text-muted-foreground">Manage users, devices, and platform settings</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -388,12 +406,74 @@ const Admin = () => {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Income</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              ${(totalIncome / 100).toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This month: ${(monthlyIncome / 100).toFixed(2)}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Transaction Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{transactions.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {transactions.filter(t => t.status === 'paid').length} successful
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              ${(monthlyIncome / 100).toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This month
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Average Transaction</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${transactions.length > 0 ? (transactions.reduce((sum, t) => sum + t.amount, 0) / transactions.length / 100).toFixed(2) : '0.00'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Per transaction
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="users" className="w-full">
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="devices">Devices</TabsTrigger>
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="admin">Admin Settings</TabsTrigger>
         </TabsList>
 
@@ -517,6 +597,68 @@ const Admin = () => {
                   ))}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="transactions">
+          <Card>
+            <CardHeader>
+              <CardTitle>Transaction History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {transactions.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No transactions found
+                </div>
+              ) : (
+                <Table>
+                                      <TableHeader>
+                      <TableRow>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Billing Cycle</TableHead>
+                        <TableHead>Next Billing</TableHead>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                  <TableBody>
+                    {transactions.map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>{transaction.customer_email}</TableCell>
+                        <TableCell className="font-mono">
+                          ${(transaction.amount / 100).toFixed(2)} {transaction.currency.toUpperCase()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={transaction.status === 'paid' ? 'default' : 'secondary'}
+                            className={transaction.status === 'paid' ? 'bg-green-500' : ''}
+                          >
+                            {transaction.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {transaction.billing_cycle}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {transaction.next_billing_date ? 
+                            new Date(transaction.next_billing_date).toLocaleDateString() : 
+                            'N/A'
+                          }
+                        </TableCell>
+                        <TableCell>{transaction.product_name}</TableCell>
+                        <TableCell>
+                          {new Date(transaction.created_at).toLocaleDateString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

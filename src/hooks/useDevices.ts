@@ -7,6 +7,7 @@ export interface Device {
   id: string;
   device_id: string;
   name: string;
+  device_type: 'AIR' | 'SOIL';
   owner_id: string;
   created_at: string;
   updated_at: string;
@@ -53,10 +54,10 @@ export const useUpdateDevice = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+    mutationFn: async ({ id, name, device_type }: { id: string; name: string; device_type: 'AIR' | 'SOIL' }) => {
       const { data, error } = await supabase
         .from('devices')
-        .update({ name })
+        .update({ name, device_type })
         .eq('id', id)
         .select()
         .single();
@@ -117,7 +118,7 @@ export const useAddDevice = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ device_id, name }: { device_id: string; name: string }) => {
+    mutationFn: async ({ device_id, name, device_type }: { device_id: string; name: string; device_type: 'AIR' | 'SOIL' }) => {
       // Get current user session
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
@@ -128,7 +129,7 @@ export const useAddDevice = () => {
       // Insert device directly into database
       const { data: device, error: insertError } = await supabase
         .from('devices')
-        .insert([{ device_id, name, owner_id: user.id }])
+        .insert([{ device_id, name, device_type, owner_id: user.id }])
         .select()
         .single();
 
@@ -138,7 +139,7 @@ export const useAddDevice = () => {
 
       // Generate JWT token client-side
       const secret = new TextEncoder().encode(
-        process.env.NEXT_PUBLIC_DEVICE_JWT_SECRET || 't3fYXmyny2Hvf+ZBd4jUp3ixZRySEnNtx7iArRZuCdqtmtBR7KvNLn/4G957qBHDnK1uovHokQITGQF8behvVA=='
+        import.meta.env.VITE_DEVICE_JWT_SECRET || 't3fYXmyny2Hvf+ZBd4jUp3ixZRySEnNtx7iArRZuCdqtmtBR7KvNLn/4G957qBHDnK1uovHokQITGQF8behvVA=='
       );
       
       const payload = { 
@@ -161,11 +162,20 @@ export const useAddDevice = () => {
       });
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add device",
-        variant: "destructive",
-      });
+      // Handle specific database constraint violations
+      if (error.code === '23505' && error.message?.includes('devices_device_id_key')) {
+        toast({
+          title: "Device ID Already Exists",
+          description: "A device with this ID is already registered. Please use a different device ID.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to add device",
+          variant: "destructive",
+        });
+      }
     },
   });
 };
