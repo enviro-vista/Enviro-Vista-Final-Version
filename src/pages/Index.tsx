@@ -41,6 +41,7 @@ const MetricCard = lazy(() => import("@/components/MetricCard"));
 const DeviceCard = lazy(() => import("@/components/DeviceCard"));
 const ChartView = lazy(() => import("@/components/ChartView"));
 const AddDeviceDialog = lazy(() => import("@/components/AddDeviceDialog"));
+const AiChat = lazy(() => import("@/components/AiChat"));
 
 const Index = () => {
   const [activeView, setActiveView] = useState<'grid' | 'chart'>('grid');
@@ -239,7 +240,6 @@ const Index = () => {
               icon={Thermometer}
               gradient="temp-gradient"
               trend={devices.length > 0 ? "+0.5°C" : "No data"}
-              compact
             />
           </Suspense>
           <Suspense fallback={<div className="bg-muted rounded-lg h-24 animate-pulse"></div>}>
@@ -250,7 +250,6 @@ const Index = () => {
               icon={Droplets}
               gradient="humidity-gradient"
               trend={devices.length > 0 ? "-2.1%" : "No data"}
-              compact
             />
           </Suspense>
           <Suspense fallback={<div className="bg-muted rounded-lg h-24 animate-pulse"></div>}>
@@ -261,7 +260,6 @@ const Index = () => {
               icon={Gauge}
               gradient="pressure-gradient"
               trend={devices.length > 0 ? "+1.2 hPa" : "No data"}
-              compact
             />
           </Suspense>
           <Suspense fallback={<div className="bg-muted rounded-lg h-24 animate-pulse"></div>}>
@@ -272,7 +270,6 @@ const Index = () => {
               icon={Cloud}
               gradient="dewpoint-gradient"
               trend={devices.length > 0 ? "+0.3°C" : "No data"}
-              compact
             />
           </Suspense>
         </div>
@@ -376,43 +373,55 @@ const Index = () => {
           </Tabs>
         </div>
 
-        {/* Main Content */}
-        {activeView === 'grid' ? (
-          <div className="space-y-4">
-            {/* Inline upgrade prompt in data section for free users */}
-            {isFree && (
-              <UpgradePrompt 
-                title="Premium Sensors & Metrics" 
-                description="Unlock CO₂, light sensors, soil monitoring, and advanced calculated metrics"
-                compact={true}
-                onDismiss={() => {}}
-              />
-            )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {devices.length > 0 ? (
-                devices.map((device) => (
-                  <Suspense key={device.id} fallback={<div className="bg-muted rounded-lg h-40 animate-pulse"></div>}>
-                    <DeviceCard device={device} onDeviceUpdated={() => {}} />
-                  </Suspense>
-                ))
-              ) : (
-              <div className="col-span-full text-center py-8">
-                <p className="text-muted-foreground mb-4">No devices found. Add your first device to get started!</p>
-                <Suspense fallback={<Button variant="default" disabled>Add Device</Button>}>
-                  <AddDeviceDialog />
+        {/* Main Content Layout - Split between devices and AI chat */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Main content area - takes 2/3 of space on large screens */}
+          <div className="xl:col-span-2 space-y-4">
+            {activeView === 'grid' ? (
+              <div className="space-y-4">
+                {/* Inline upgrade prompt in data section for free users */}
+                {isFree && (
+                  <UpgradePrompt 
+                    title="Premium Sensors & Metrics" 
+                    description="Unlock CO₂, light sensors, soil monitoring, and advanced calculated metrics"
+                    compact={true}
+                    onDismiss={() => {}}
+                  />
+                )}
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {devices.length > 0 ? (
+                    devices.map((device) => (
+                      <Suspense key={device.id} fallback={<div className="bg-muted rounded-lg h-40 animate-pulse"></div>}>
+                        <DeviceCard device={device as any} onDeviceUpdated={() => {}} />
+                      </Suspense>
+                    ))
+                  ) : (
+                  <div className="col-span-full text-center py-8">
+                    <p className="text-muted-foreground mb-4">No devices found. Add your first device to get started!</p>
+                    <Suspense fallback={<Button variant="default" disabled>Add Device</Button>}>
+                      <AddDeviceDialog />
+                    </Suspense>
+                  </div>
+                )}
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-hidden">
+                <Suspense fallback={<div className="bg-muted rounded-lg h-64 animate-pulse"></div>}>
+                  <ChartView devices={devices as any} selectedDevice={selectedDevice} />
                 </Suspense>
               </div>
             )}
-            </div>
           </div>
-        ) : (
-          <div className="overflow-hidden">
-            <Suspense fallback={<div className="bg-muted rounded-lg h-64 animate-pulse"></div>}>
-              <ChartView devices={devices} selectedDevice={selectedDevice} />
+
+          {/* AI Chat Section - takes 1/3 of space on large screens, full width on smaller */}
+          <div className="xl:col-span-1">
+            <Suspense fallback={<div className="bg-muted rounded-lg h-96 animate-pulse"></div>}>
+              <AiChat className="h-fit" />
             </Suspense>
           </div>
-        )}
+        </div>
       </main>
     </div>
   );

@@ -23,6 +23,7 @@ const EditDeviceDialog = ({
 }: EditDeviceDialogProps) => {
   const [name, setName] = useState(device.name);
   const [deviceType, setDeviceType] = useState<'AIR' | 'SOIL'>(device.device_type);
+  const [cropType, setCropType] = useState(device.crop_type || '');
   const updateDevice = useUpdateDevice();
   const { toast } = useToast();
 
@@ -32,7 +33,8 @@ const EditDeviceDialog = ({
       await updateDevice.mutateAsync({ 
         id: device.id, 
         name,
-        device_type: deviceType
+        device_type: deviceType,
+        crop_type: cropType.trim() || null
       });
       
       toast({
@@ -83,6 +85,18 @@ const EditDeviceDialog = ({
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="crop-type">Crop Type (Optional)</Label>
+            <Input
+              id="crop-type"
+              placeholder="e.g., Tomato, Lettuce, Basil, etc."
+              value={cropType}
+              onChange={(e) => setCropType(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Specify what crop or plant you're monitoring (optional but helpful for organization).
+            </p>
+          </div>
           <div className="flex justify-end gap-2">
             <Button 
               type="button" 
@@ -93,7 +107,7 @@ const EditDeviceDialog = ({
             </Button>
             <Button 
               type="submit" 
-              disabled={updateDevice.isPending || (name.trim() === device.name && deviceType === device.device_type)}
+              disabled={updateDevice.isPending || (name.trim() === device.name && deviceType === device.device_type && (cropType.trim() || null) === device.crop_type)}
             >
               {updateDevice.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes

@@ -81,11 +81,16 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
         <div className="flex items-start justify-between mb-4">
           <div className="space-y-1">
             <h3 className="font-semibold tracking-tight">{device.name}</h3>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <p className="text-sm text-muted-foreground">{device.device_id}</p>
               <Badge variant="secondary" className="text-xs">
                 {device.device_type === 'AIR' ? '🌬️ Air' : '🌱 Soil'}
               </Badge>
+              {device.crop_type && (
+                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                  🌾 {device.crop_type}
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">

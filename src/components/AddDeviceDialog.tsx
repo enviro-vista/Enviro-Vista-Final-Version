@@ -12,6 +12,7 @@ const AddDeviceDialog = () => {
   const [deviceId, setDeviceId] = useState('');
   const [name, setName] = useState('');
   const [deviceType, setDeviceType] = useState<'AIR' | 'SOIL'>('AIR');
+  const [cropType, setCropType] = useState<string>('');
   const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const addDevice = useAddDevice();
   const { data: existingDevices } = useDevices();
@@ -30,11 +31,17 @@ const AddDeviceDialog = () => {
     }
     
     try {
-      const res = await addDevice.mutateAsync({ device_id: deviceId.trim(), name: name.trim(), device_type: deviceType });
+      const res = await addDevice.mutateAsync({ 
+        device_id: deviceId.trim(), 
+        name: name.trim(), 
+        device_type: deviceType,
+        crop_type: cropType.trim() || null
+      });
       setDeviceToken(res.token);
       setDeviceId('');
       setName('');
       setDeviceType('AIR');
+      setCropType('');
     } catch (error) {
       // Error is handled by the mutation
       // Keep the form open so user can fix the issue
@@ -101,6 +108,18 @@ const AddDeviceDialog = () => {
                 onChange={(e) => setName(e.target.value)}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="crop-type">Crop Type (Optional)</Label>
+              <Input
+                id="crop-type"
+                placeholder="e.g., Tomato, Lettuce, Basil, etc."
+                value={cropType}
+                onChange={(e) => setCropType(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Specify what crop or plant you're monitoring (optional but helpful for organization).
+              </p>
             </div>
             <div className="flex justify-end gap-2">
               <Button 

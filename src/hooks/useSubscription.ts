@@ -47,24 +47,19 @@ export const useSubscriptionStatus = () => {
 export const useCheckSubscription = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { session } = useAuth();
   
   return useMutation({
     mutationFn: async () => {
-      if (!session) throw new Error('No session');
-
-      const { data, error } = await supabase.functions.invoke('check-subscription', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-      
-      if (error) throw error;
-      return data;
+      // Just refresh the profile data instead of calling a separate function
+      return { success: true };
     },
     onSuccess: () => {
       // Invalidate and refetch profile data
       queryClient.invalidateQueries({ queryKey: ['profile'] });
+      // toast({
+      //   title: "Status Updated",
+      //   description: "Subscription status refreshed",
+      // });
     },
     onError: (error: any) => {
       console.error('Check subscription error:', error);

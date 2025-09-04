@@ -8,6 +8,7 @@ export interface Device {
   device_id: string;
   name: string;
   device_type: 'AIR' | 'SOIL';
+  crop_type?: string | null;
   owner_id: string;
   created_at: string;
   updated_at: string;
@@ -54,10 +55,15 @@ export const useUpdateDevice = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, name, device_type }: { id: string; name: string; device_type: 'AIR' | 'SOIL' }) => {
+    mutationFn: async ({ id, name, device_type, crop_type }: { id: string; name: string; device_type: 'AIR' | 'SOIL'; crop_type?: string | null }) => {
+      const updateData: any = { name, device_type };
+      if (crop_type !== undefined) {
+        updateData.crop_type = crop_type;
+      }
+      
       const { data, error } = await supabase
         .from('devices')
-        .update({ name, device_type })
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();
@@ -118,7 +124,7 @@ export const useAddDevice = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ device_id, name, device_type }: { device_id: string; name: string; device_type: 'AIR' | 'SOIL' }) => {
+    mutationFn: async ({ device_id, name, device_type, crop_type }: { device_id: string; name: string; device_type: 'AIR' | 'SOIL'; crop_type?: string | null }) => {
       // Get current user session
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
@@ -126,10 +132,16 @@ export const useAddDevice = () => {
         throw authError || new Error('User not authenticated');
       }
 
+      // Prepare insert data
+      const insertData: any = { device_id, name, device_type, owner_id: user.id };
+      if (crop_type) {
+        insertData.crop_type = crop_type;
+      }
+
       // Insert device directly into database
       const { data: device, error: insertError } = await supabase
         .from('devices')
-        .insert([{ device_id, name, device_type, owner_id: user.id }])
+        .insert([insertData])
         .select()
         .single();
 

@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import ResetPassword from "./pages/ResetPassword";
 import SubscriptionPage from "./components/SubscriptionPage";
 import BillingPage from "./components/BillingPage";
 
@@ -51,6 +52,7 @@ const AppRoutes = () => {
     <Routes>
       {/* Public routes */}
       <Route path="/auth" element={<Auth />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       
       {/* Protected routes */}
       <Route path="/" element={

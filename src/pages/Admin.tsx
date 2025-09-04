@@ -19,6 +19,12 @@ interface AdminUser {
   email: string;
   name: string;
   subscription_tier: 'free' | 'premium';
+  billing_cycle?: string;
+  next_billing_date?: string;
+  last_payment_status?: string;
+  last_payment_date?: string;
+  last_payment_amount?: number;
+  last_payment_currency?: string;
   created_at: string;
   is_admin: boolean;
 }
@@ -109,9 +115,23 @@ const Admin = () => {
 
   const fetchUsers = async () => {
     try {
+      // Simple query from profiles table - much faster!
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, name, subscription_tier, created_at, is_admin')
+        .select(`
+          id, 
+          email, 
+          name, 
+          subscription_tier, 
+          created_at, 
+          is_admin,
+          billing_cycle,
+          next_billing_date,
+          last_payment_status,
+          last_payment_date,
+          last_payment_amount,
+          last_payment_currency
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -489,6 +509,10 @@ const Admin = () => {
                     <TableHead>Email</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Subscription</TableHead>
+                    <TableHead>Billing Cycle</TableHead>
+                    <TableHead>Next Billing</TableHead>
+                    <TableHead>Last Payment</TableHead>
+                    <TableHead>Amount</TableHead>
                     <TableHead>Admin</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead>Actions</TableHead>
@@ -503,6 +527,48 @@ const Admin = () => {
                         <Badge variant={user.subscription_tier === 'premium' ? 'default' : 'secondary'}>
                           {user.subscription_tier}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {user.billing_cycle ? (
+                          <Badge variant="outline">
+                            {user.billing_cycle}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">N/A</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.next_billing_date ? (
+                          new Date(user.next_billing_date).toLocaleDateString()
+                        ) : (
+                          <span className="text-muted-foreground">N/A</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.last_payment_date ? (
+                          <div>
+                            <div>{new Date(user.last_payment_date).toLocaleDateString()}</div>
+                            {user.last_payment_status && (
+                              <Badge 
+                                variant={user.last_payment_status === 'succeeded' ? 'default' : 'secondary'}
+                                className="text-xs mt-1"
+                              >
+                                {user.last_payment_status}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">N/A</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.last_payment_amount ? (
+                          <div className="font-mono">
+                            ${(user.last_payment_amount / 100).toFixed(2)} {user.last_payment_currency?.toUpperCase() || 'USD'}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">N/A</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={user.is_admin ? 'default' : 'outline'}>

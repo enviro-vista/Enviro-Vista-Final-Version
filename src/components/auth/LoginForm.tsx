@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LoginFormProps {
-  onToggleMode: () => void;
+  onToggleMode: (mode?: 'signup' | 'forgot-password') => void;
   onLoadingChange: (loading: boolean) => void;
 }
 
@@ -68,6 +68,15 @@ const LoginForm = ({ onToggleMode, onLoadingChange }: LoginFormProps) => {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+          <div className="text-right">
+            <button
+              type="button"
+              onClick={() => onToggleMode('forgot-password')}
+              className="text-sm text-primary hover:underline"
+            >
+              Forgot password?
+            </button>
+          </div>
         </div>
 
         <Button
@@ -82,7 +91,7 @@ const LoginForm = ({ onToggleMode, onLoadingChange }: LoginFormProps) => {
         <p className="text-sm text-muted-foreground">
           Don't have an account?{' '}
           <button
-            onClick={onToggleMode}
+            onClick={() => onToggleMode('signup')}
             className="text-primary hover:underline"
           >
             Sign up
