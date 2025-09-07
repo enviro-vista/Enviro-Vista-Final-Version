@@ -16,8 +16,8 @@ import {
   CreditCard,
   User
 } from "lucide-react";
-import Header from "@/components/Header";
 import SubscriptionStatusBadge from "@/components/SubscriptionStatusBadge";
+import { AppLayout } from "@/components/AppLayout";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import { useDevices } from "@/hooks/useDevices";
 import { useAuth } from "@/hooks/useAuth";
@@ -204,20 +204,24 @@ const Index = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-dashboard-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading devices...</p>
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading devices...</p>
+          </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      <Header />
-      
-      <main className="container mx-auto px-3 py-4 space-y-4">
+    <AppLayout 
+      title="Environmental Dashboard"
+      subtitle="Monitor your sensors and environmental data"
+      breadcrumbs={[{ title: "Dashboard" }]}
+    >
+      <div className="space-y-4">
         
         {/* Upgrade Prompt for Free Users */}
         {isFree && showUpgradePrompt && (
@@ -422,8 +426,8 @@ const Index = () => {
             </Suspense>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 

@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, useTotalIncome, useMonthlyIncome } from "@/hooks/useTransactions";
 import { Users, Activity, Shield, Trash2, Lock, Loader2, DollarSign, TrendingUp } from "lucide-react";
+import { AppLayout } from "@/components/AppLayout";
 
 interface AdminUser {
   id: string;
@@ -291,18 +292,23 @@ const Admin = () => {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
+      <AppLayout>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   // Admin setup screen (when no admins exist)
   if (setupMode) {
     return (
-      <div className="container mx-auto p-6 max-w-md">
+      <AppLayout 
+        title="Admin Setup"
+        subtitle="Complete initial administrator setup"
+        breadcrumbs={[{ title: "Admin" }, { title: "Setup" }]}
+      >
+        <div className="max-w-md mx-auto">
         <Card className="border border-blue-500">
           <CardHeader className="text-center">
             <Lock className="h-12 w-12 mx-auto mb-4 text-blue-500" />
@@ -355,13 +361,18 @@ const Admin = () => {
             Contact support if you've lost the setup password.
           </p>
         </div>
-      </div>
+        </div>
+      </AppLayout>
     );
   }
 
   if (!isAdmin) {
     return (
-      <div className="container mx-auto p-6">
+      <AppLayout 
+        title="Access Denied"
+        subtitle="Administrator privileges required"
+        breadcrumbs={[{ title: "Admin" }]}
+      >
         <Card>
           <CardContent className="p-6">
             <div className="text-center">
@@ -383,16 +394,16 @@ const Admin = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <p className="text-muted-foreground">Manage users, devices, and platform settings</p>
-      </div>
+    <AppLayout 
+      title="Admin Dashboard"
+      subtitle="Manage users, devices, and platform settings"
+      breadcrumbs={[{ title: "Administration" }, { title: "Dashboard" }]}
+    >
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <Card>
@@ -778,7 +789,7 @@ const Admin = () => {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </AppLayout>
   );
 };
 

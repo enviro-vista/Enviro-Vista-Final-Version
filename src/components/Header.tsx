@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -23,11 +23,33 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Bell, User, CloudRain, Settings } from "lucide-react";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { HamburgerMenu } from "@/components/ui/hamburger-menu";
+import { supabase } from "@/integrations/supabase/client";
 
 const Header = () => {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [liveMonitoring, setLiveMonitoring] = useState(true);
   const [alertsEnabled, setAlertsEnabled] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase.rpc('is_admin');
+        if (!error) {
+          setIsAdmin(!!data);
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      }
+    };
+
+    checkAdminStatus();
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -39,6 +61,7 @@ const Header = () => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <HamburgerMenu isAdmin={isAdmin} />
             <div className="flex items-center gap-2">
               <CloudRain className="h-8 w-8 text-primary" />
               <div>
@@ -53,21 +76,24 @@ const Header = () => {
               Live Monitoring
             </Badge>
 
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" aria-label="Notifications">
-                  <Bell className="h-5 w-5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" sideOffset={8} className="w-80">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Notifications</h3>
-                  <p className="text-xs text-muted-foreground">You're all caught up. No new alerts.</p>
-                </div>
-              </PopoverContent>
-            </Popover>
+            <div className="hidden md:flex items-center gap-3">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" aria-label="Notifications">
+                    <Bell className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" sideOffset={8} className="w-80">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Notifications</h3>
+                    <p className="text-xs text-muted-foreground">You're all caught up. No new alerts.</p>
+                  </div>
+                </PopoverContent>
+              </Popover>
 
-            <Dialog>
+              <ThemeToggle />
+
+              <Dialog>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="sm" aria-label="Settings">
                   <Settings className="h-5 w-5" />
@@ -110,20 +136,21 @@ const Header = () => {
                   </Button>
                 </DialogFooter>
               </DialogContent>
-            </Dialog>
+              </Dialog>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" aria-label="User menu">
-                  <User className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>Sign out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" aria-label="User menu">
+                    <User className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>Sign out</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </div>

@@ -53,6 +53,14 @@
     --metric-bg: linear-gradient(135deg, hsl(180 70% 96%) 0%, hsl(200 60% 94%) 100%);
 
     --radius: 0.75rem;
+    
+    /* Sidebar colors */
+    --sidebar: 220 20% 98%;
+    --sidebar-foreground: 220 40% 8%;
+    --sidebar-border: 220 35% 85%;
+    --sidebar-accent: 220 30% 92%;
+    --sidebar-accent-foreground: 220 40% 8%;
+    --sidebar-ring: 180 75% 35%;
   }
 
   .dark {
@@ -75,12 +83,21 @@
     --card-hover: 220 50% 10%;
     --glass-bg: 220 50% 8%;
     --metric-bg: linear-gradient(135deg, hsl(180 40% 8%) 0%, hsl(200 35% 10%) 100%);
+    
+    /* Sidebar colors for dark mode */
+    --sidebar: 220 50% 10%;
+    --sidebar-foreground: 220 30% 92%;
+    --sidebar-border: 220 40% 18%;
+    --sidebar-accent: 220 40% 15%;
+    --sidebar-accent-foreground: 220 30% 92%;
+    --sidebar-ring: 180 75% 35%;
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    transition: color 0.2s ease-in-out, background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
   }
 
   body {

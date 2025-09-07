@@ -56,6 +56,15 @@ export default {
 				dewpoint: 'hsl(var(--dewpoint))',
 				success: 'hsl(var(--success))',
 				warning: 'hsl(var(--warning))',
+				// Sidebar colors
+				sidebar: {
+					DEFAULT: 'hsl(var(--sidebar))',
+					foreground: 'hsl(var(--sidebar-foreground))',
+					accent: 'hsl(var(--sidebar-accent))',
+					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+					border: 'hsl(var(--sidebar-border))',
+					ring: 'hsl(var(--sidebar-ring))',
+				},
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

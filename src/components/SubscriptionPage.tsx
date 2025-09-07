@@ -5,24 +5,19 @@ import { ArrowLeft, Crown, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import SubscriptionUpgrade from "./SubscriptionUpgrade";
 import { useSubscriptionStatus } from "@/hooks/useSubscription";
+import { AppLayout } from "./AppLayout";
 
 const SubscriptionPage = () => {
   const { isPremium } = useSubscriptionStatus();
 
   if (isPremium) {
     return (
-      <div className="min-h-screen bg-dashboard-bg">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center gap-4 mb-8">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </Link>
-            </Button>
-          </div>
-
-          <div className="max-w-2xl mx-auto">
+      <AppLayout 
+        title="Premium Subscription"
+        subtitle="Manage your premium environmental monitoring features"
+        breadcrumbs={[{ title: "Account" }, { title: "Subscription" }]}
+      >
+        <div className="max-w-2xl mx-auto">
             <Card className="border-primary/50 bg-gradient-to-br from-primary/5 to-accent/5">
               <CardHeader className="text-center">
                 <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary to-primary/60 rounded-full flex items-center justify-center mb-4">
@@ -64,34 +59,26 @@ const SubscriptionPage = () => {
                 </div>
               </CardContent>
             </Card>
-          </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-dashboard-bg">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
-            </Link>
-          </Button>
-        </div>
-
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Unlock advanced environmental monitoring with premium sensors and analytics
-          </p>
-        </div>
-
-        <SubscriptionUpgrade />
+    <AppLayout 
+      title="Upgrade to Premium"
+      subtitle="Unlock advanced environmental monitoring features"
+      breadcrumbs={[{ title: "Account" }, { title: "Subscription" }]}
+    >
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          Unlock advanced environmental monitoring with premium sensors and analytics
+        </p>
       </div>
-    </div>
+
+      <SubscriptionUpgrade />
+    </AppLayout>
   );
 };
 

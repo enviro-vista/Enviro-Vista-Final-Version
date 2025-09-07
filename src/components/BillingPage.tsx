@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { AppLayout } from "./AppLayout";
 
 const BillingPage = () => {
   const { isPremium, subscriptionTier } = useSubscriptionStatus();
@@ -53,16 +54,11 @@ const BillingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-dashboard-bg">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
-            </Link>
-          </Button>
-        </div>
+    <AppLayout 
+      title="Billing & Payments"
+      subtitle="Manage your subscription and payment information"
+      breadcrumbs={[{ title: "Account" }, { title: "Billing" }]}
+    >
 
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="text-center">
@@ -244,8 +240,7 @@ const BillingPage = () => {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </div>
+    </AppLayout>
   );
 };
 
