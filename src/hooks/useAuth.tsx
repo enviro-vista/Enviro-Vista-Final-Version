@@ -22,8 +22,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Listen for auth changes FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         console.log('Auth state change:', event, session?.user?.email);
+        
+        // Check if user account is deleted in profiles table
+        // Temporarily disabled until migration is applied
+        // if (session?.user) {
+        //   const { data: profile } = await supabase
+        //     .from('profiles')
+        //     .select('status')
+        //     .eq('id', session.user.id)
+        //     .single();
+        //   
+        //   if (profile?.status === 'deleted') {
+        //     console.log('User account is deleted, signing out');
+        //     await supabase.auth.signOut();
+        //     setSession(null);
+        //     setUser(null);
+        //     setLoading(false);
+        //     return;
+        //   }
+        // }
+        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -31,7 +51,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 
     // THEN get initial session only once
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      // Check if user account is deleted in profiles table
+      // Temporarily disabled until migration is applied
+      // if (session?.user) {
+      //   const { data: profile } = await supabase
+      //     .from('profiles')
+      //     .select('status')
+      //     .eq('id', session.user.id)
+      //     .single();
+      //   
+      //   if (profile?.status === 'deleted') {
+      //     console.log('Initial session user account is deleted, signing out');
+      //     await supabase.auth.signOut();
+      //     setSession(null);
+      //     setUser(null);
+      //     setLoading(false);
+      //     return;
+      //   }
+      // }
+      
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -44,7 +83,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    return await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    
+    // Check if user account is deleted in profiles table
+    // Temporarily disabled until migration is applied
+    // if (data.user) {
+    //   const { data: profile } = await supabase
+    //     .from('profiles')
+    //     .select('status')
+    //     .eq('id', data.user.id)
+    //     .single();
+    //   
+    //   if (profile?.status === 'deleted') {
+    //     // Sign out the user immediately
+    //     await supabase.auth.signOut();
+    //     // Return invalid credentials error to maintain security
+    //     return {
+    //       data: null,
+    //       error: {
+    //         message: 'Invalid login credentials'
+    //       }
+    //     };
+    //   }
+    // }
+    
+    return { data, error };
   };
 
   const signUp = async (email: string, password: string, name?: string) => {

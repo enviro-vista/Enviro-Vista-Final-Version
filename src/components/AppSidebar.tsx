@@ -88,12 +88,6 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
       description: 'Overview and metrics'
     },
     {
-      name: 'Analytics',
-      href: '/analytics',
-      icon: BarChart3,
-      description: 'Data analysis and charts'
-    },
-    {
       name: 'Devices',
       href: '/devices',
       icon: Activity,
@@ -104,6 +98,12 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
   // Account navigation items
   const accountNavigation = [
     {
+      name: 'Profile',
+      href: '/profile',
+      icon: User,
+      description: 'Account settings and security'
+    },
+    {
       name: 'Subscription',
       href: '/subscription',
       icon: CreditCard,
@@ -112,7 +112,7 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
     {
       name: 'Billing',
       href: '/billing',
-      icon: User,
+      icon: DollarSign,
       description: 'Payment and invoices'
     },
   ];
@@ -125,24 +125,24 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
       icon: Shield,
       description: 'Administrative controls'
     },
-    {
-      name: 'User Management',
-      href: '/admin/users',
-      icon: Users,
-      description: 'Manage platform users'
-    },
-    {
-      name: 'System',
-      href: '/admin/system',
-      icon: Database,
-      description: 'System settings'
-    },
-    {
-      name: 'Revenue',
-      href: '/admin/revenue',
-      icon: DollarSign,
-      description: 'Financial overview'
-    },
+    // {
+    //   name: 'User Management',
+    //   href: '/admin/users',
+    //   icon: Users,
+    //   description: 'Manage platform users'
+    // },
+    // {
+    //   name: 'System',
+    //   href: '/admin/system',
+    //   icon: Database,
+    //   description: 'System settings'
+    // },
+    // {
+    //   name: 'Revenue',
+    //   href: '/admin/revenue',
+    //   icon: DollarSign,
+    //   description: 'Financial overview'
+    // },
   ];
 
   return (

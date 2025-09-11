@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, useTotalIncome, useMonthlyIncome } from "@/hooks/useTransactions";
-import { Users, Activity, Shield, Trash2, Lock, Loader2, DollarSign, TrendingUp } from "lucide-react";
+import { Users, Activity, Shield, Trash2, Lock, Loader2, DollarSign, TrendingUp, RotateCcw, UserCheck } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 
 interface AdminUser {
@@ -28,6 +28,11 @@ interface AdminUser {
   last_payment_currency?: string;
   created_at: string;
   is_admin: boolean;
+  status?: string;
+  deleted_at?: string;
+  deleted_by?: string;
+  restored_at?: string;
+  restored_by?: string;
 }
 
 interface AdminDevice {
@@ -51,11 +56,21 @@ interface AdminTransaction {
   created_at: string;
 }
 
+interface DeletedUser {
+  id: string;
+  email: string;
+  deleted_at: string;
+  deleted_by: string;
+  status: string;
+  created_at: string;
+}
+
 const Admin = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [devices, setDevices] = useState<AdminDevice[]>([]);
+  const [deletedUsers, setDeletedUsers] = useState<DeletedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminCount, setAdminCount] = useState(0);
@@ -80,6 +95,7 @@ const Admin = () => {
     if (isAdmin || setupMode) {
       fetchUsers();
       fetchDevices();
+      fetchDeletedUsers();
     }
   }, [isAdmin, setupMode]);
 
@@ -131,7 +147,12 @@ const Admin = () => {
           last_payment_status,
           last_payment_date,
           last_payment_amount,
-          last_payment_currency
+          last_payment_currency,
+          status,
+          deleted_at,
+          deleted_by,
+          restored_at,
+          restored_by
         `)
         .order('created_at', { ascending: false });
 
@@ -175,6 +196,37 @@ const Admin = () => {
     }
   };
 
+  const fetchDeletedUsers = async () => {
+    try {
+      // Get users with deleted status from profiles table
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id, email, status, deleted_at, deleted_by, created_at')
+        .eq('status', 'deleted')
+        .order('deleted_at', { ascending: false });
+
+      if (error) throw error;
+
+      const deletedUsers = profiles?.map(profile => ({
+        id: profile.id,
+        email: profile.email || 'Unknown',
+        deleted_at: profile.deleted_at || '',
+        deleted_by: profile.deleted_by || 'Unknown',
+        status: profile.status || 'deleted',
+        created_at: profile.created_at
+      })) || [];
+
+      setDeletedUsers(deletedUsers);
+    } catch (error) {
+      console.error('Error fetching deleted users:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch deleted users.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const updateUserTier = async (userId: string, tier: 'free' | 'premium') => {
     try {
       const { error } = await supabase
@@ -195,6 +247,37 @@ const Admin = () => {
       toast({
         title: "Error",
         description: "Failed to update user subscription.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const restoreUser = async (userId: string) => {
+    try {
+      // Restore user by updating their profile status
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          status: 'active',
+          restored_at: new Date().toISOString(),
+          restored_by: user?.email || 'admin'
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "User account has been restored successfully.",
+      });
+
+      fetchDeletedUsers();
+      fetchUsers();
+    } catch (error) {
+      console.error('Error restoring user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to restore user account.",
         variant: "destructive",
       });
     }
@@ -503,6 +586,7 @@ const Admin = () => {
       <Tabs defaultValue="users" className="w-full">
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="deleted">Deleted Users</TabsTrigger>
           <TabsTrigger value="devices">Devices</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="admin">Admin Settings</TabsTrigger>
@@ -618,6 +702,80 @@ const Admin = () => {
                   ))}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="deleted">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trash2 className="h-5 w-5" />
+                Deleted Users Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {deletedUsers.length === 0 ? (
+                <div className="text-center py-8">
+                  <UserCheck className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">No deleted users found.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Deleted At</TableHead>
+                      <TableHead>Deleted By</TableHead>
+                      <TableHead>Original Join Date</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {deletedUsers.map((deletedUser) => (
+                      <TableRow key={deletedUser.id}>
+                        <TableCell className="font-medium">{deletedUser.email}</TableCell>
+                        <TableCell>
+                          {deletedUser.deleted_at ? new Date(deletedUser.deleted_at).toLocaleDateString() : 'Unknown'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {deletedUser.deleted_by}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(deletedUser.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <RotateCcw className="h-4 w-4 mr-2" />
+                                Restore
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Restore User Account</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to restore the account for {deletedUser.email}? 
+                                  This will reactivate their account and allow them to sign in again.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => restoreUser(deletedUser.id)}>
+                                  Restore Account
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

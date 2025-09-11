@@ -37,6 +37,36 @@ export const useDevices = () => {
             timestamp
           )
         `)
+        .order('created_at', { ascending: false })
+        .limit(2); // Limit to 2 devices for dashboard
+
+      if (error) throw error;
+
+      return data.map(device => ({
+        ...device,
+        latest_reading: device.readings?.[0] || null
+      }));
+    },
+  });
+};
+
+// Hook for getting all devices (for devices page)
+export const useAllDevices = () => {
+  return useQuery({
+    queryKey: ['all-devices'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('devices')
+        .select(`
+          *,
+          readings!readings_device_id_fkey (
+            temperature,
+            humidity,
+            pressure,
+            dew_point,
+            timestamp
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

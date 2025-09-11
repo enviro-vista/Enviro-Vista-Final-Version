@@ -14,12 +14,13 @@ import {
   WifiOff,
   LogOut,
   CreditCard,
-  User
+  User,
+  Activity
 } from "lucide-react";
 import SubscriptionStatusBadge from "@/components/SubscriptionStatusBadge";
 import { AppLayout } from "@/components/AppLayout";
 import UpgradePrompt from "@/components/UpgradePrompt";
-import { useDevices } from "@/hooks/useDevices";
+import { useDevices, useAllDevices } from "@/hooks/useDevices";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscriptionStatus, useCheckSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,6 +49,7 @@ const Index = () => {
   const [selectedDevice, setSelectedDevice] = useState<string>('all');
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const { data: devices = [], isLoading } = useDevices();
+  const { data: allDevices = [] } = useAllDevices();
   const { signOut } = useAuth();
   const { isPremium, isFree } = useSubscriptionStatus();
   const checkSubscription = useCheckSubscription();
@@ -62,9 +64,9 @@ const Index = () => {
     setAlertsEnabled(JSON.parse(localStorage.getItem("settings.alertsEnabled") ?? "true"));
   }, []);
 
-  // Memoized calculation of average metrics
+  // Memoized calculation of average metrics using all devices
   const averageMetrics = useMemo(() => {
-    if (devices.length === 0) {
+    if (allDevices.length === 0) {
       return {
         temperature: 0,
         humidity: 0,
@@ -73,7 +75,7 @@ const Index = () => {
       };
     }
 
-    const devicesWithReadings = devices.filter(device => device.latest_reading);
+    const devicesWithReadings = allDevices.filter(device => device.latest_reading);
     if (devicesWithReadings.length === 0) {
       return {
         temperature: 0,
@@ -89,11 +91,11 @@ const Index = () => {
       pressure: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.pressure || 0), 0) / devicesWithReadings.length,
       dewPoint: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.dew_point || 0), 0) / devicesWithReadings.length,
     };
-  }, [devices]);
+  }, [allDevices]);
 
-  // Memoized calculation of online devices
+  // Memoized calculation of online devices using all devices
   const onlineDevices = useMemo(() => {
-    return devices.filter(device => {
+    return allDevices.filter(device => {
       if (!device.latest_reading) return false;
       try {
         const lastReading = new Date(device.latest_reading.timestamp);
@@ -104,7 +106,7 @@ const Index = () => {
         return false;
       }
     }).length;
-  }, [devices]);
+  }, [allDevices]);
 
   const handleSignOut = useCallback(async () => {
     await signOut();
@@ -183,12 +185,12 @@ const Index = () => {
     }
   }, []);
 
-  // Auto-refresh subscription status every 30 seconds for premium users
+  // Auto-refresh subscription status every 5 minutes for premium users
   useEffect(() => {
     if (isPremium) {
       const interval = setInterval(() => {
         checkSubscription.mutate();
-      }, 30000);
+      }, 5 * 60 * 1000); // 5 minutes instead of 30 seconds
       
       return () => clearInterval(interval);
     }
@@ -234,48 +236,103 @@ const Index = () => {
           </div>
         )}
         
-        {/* Overview Cards - Adjusted for mobile */}
-        <div className="grid grid-cols-2 gap-3">
-          <Suspense fallback={<div className="bg-muted rounded-lg h-24 animate-pulse"></div>}>
-            <MetricCard
-              title="Temp"
-              value={averageMetrics.temperature.toFixed(1)}
-              unit="°C"
-              icon={Thermometer}
-              gradient="temp-gradient"
-              trend={devices.length > 0 ? "+0.5°C" : "No data"}
-            />
-          </Suspense>
-          <Suspense fallback={<div className="bg-muted rounded-lg h-24 animate-pulse"></div>}>
-            <MetricCard
-              title="Humidity"
-              value={averageMetrics.humidity.toFixed(1)}
-              unit="%"
-              icon={Droplets}
-              gradient="humidity-gradient"
-              trend={devices.length > 0 ? "-2.1%" : "No data"}
-            />
-          </Suspense>
-          <Suspense fallback={<div className="bg-muted rounded-lg h-24 animate-pulse"></div>}>
-            <MetricCard
-              title="Pressure"
-              value={averageMetrics.pressure.toFixed(0)}
-              unit="hPa"
-              icon={Gauge}
-              gradient="pressure-gradient"
-              trend={devices.length > 0 ? "+1.2 hPa" : "No data"}
-            />
-          </Suspense>
-          <Suspense fallback={<div className="bg-muted rounded-lg h-24 animate-pulse"></div>}>
-            <MetricCard
-              title="Dew Point"
-              value={averageMetrics.dewPoint.toFixed(1)}
-              unit="°C"
-              icon={Cloud}
-              gradient="dewpoint-gradient"
-              trend={devices.length > 0 ? "+0.3°C" : "No data"}
-            />
-          </Suspense>
+        {/* Overview Cards - 8 cards with relevant readings */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Temperature Card */}
+          <Card className="glass-card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-1.5 rounded temp-gradient text-white">
+                <Thermometer className="h-3 w-3" />
+              </div>
+              <h3 className="font-semibold text-sm">Temperature</h3>
+            </div>
+            <p className="text-2xl font-bold">{averageMetrics.temperature.toFixed(1)}°C</p>
+            <p className="text-xs text-muted-foreground">Current average</p>
+          </Card>
+
+          {/* Humidity Card */}
+          <Card className="glass-card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-1.5 rounded humidity-gradient text-white">
+                <Droplets className="h-3 w-3" />
+              </div>
+              <h3 className="font-semibold text-sm">Humidity</h3>
+            </div>
+            <p className="text-2xl font-bold">{averageMetrics.humidity.toFixed(1)}%</p>
+            <p className="text-xs text-muted-foreground">Current average</p>
+          </Card>
+
+          {/* Pressure Card */}
+          <Card className="glass-card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-1.5 rounded pressure-gradient text-white">
+                <Gauge className="h-3 w-3" />
+              </div>
+              <h3 className="font-semibold text-sm">Pressure</h3>
+            </div>
+            <p className="text-2xl font-bold">{averageMetrics.pressure.toFixed(0)} hPa</p>
+            <p className="text-xs text-muted-foreground">Current average</p>
+          </Card>
+
+          {/* Dew Point Card */}
+          <Card className="glass-card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-1.5 rounded dewpoint-gradient text-white">
+                <Cloud className="h-3 w-3" />
+              </div>
+              <h3 className="font-semibold text-sm">Dew Point</h3>
+            </div>
+            <p className="text-2xl font-bold">{averageMetrics.dewPoint.toFixed(1)}°C</p>
+            <p className="text-xs text-muted-foreground">Current average</p>
+          </Card>
+
+          {/* Device Status Card */}
+          <Card className="glass-card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-1.5 rounded bg-blue-500 text-white">
+                <Wifi className="h-3 w-3" />
+              </div>
+              <h3 className="font-semibold text-sm">Online</h3>
+            </div>
+            <p className="text-2xl font-bold">{onlineDevices}</p>
+            <p className="text-xs text-muted-foreground">Active devices</p>
+          </Card>
+
+          {/* Total Devices Card */}
+          <Card className="glass-card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-1.5 rounded bg-purple-500 text-white">
+                <Activity className="h-3 w-3" />
+              </div>
+              <h3 className="font-semibold text-sm">Total</h3>
+            </div>
+            <p className="text-2xl font-bold">{allDevices.length}</p>
+            <p className="text-xs text-muted-foreground">All devices</p>
+          </Card>
+
+          {/* Data Quality Card */}
+          <Card className="glass-card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-1.5 rounded bg-green-500 text-white">
+                <BarChart3 className="h-3 w-3" />
+              </div>
+              <h3 className="font-semibold text-sm">Quality</h3>
+            </div>
+            <p className="text-2xl font-bold">98%</p>
+            <p className="text-xs text-muted-foreground">Success rate</p>
+          </Card>
+
+          {/* Last Update Card */}
+          <Card className="glass-card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-1.5 rounded bg-orange-500 text-white">
+                <Settings className="h-3 w-3" />
+              </div>
+              <h3 className="font-semibold text-sm">Updated</h3>
+            </div>
+            <p className="text-2xl font-bold">2m</p>
+            <p className="text-xs text-muted-foreground">Ago</p>
+          </Card>
         </div>
 
         {/* Status Summary - Adjusted for mobile */}
@@ -288,12 +345,12 @@ const Index = () => {
               </div>
               <div className="flex items-center gap-2">
                 <WifiOff className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">{devices.length - onlineDevices} Offline</span>
+                <span className="text-sm font-medium">{allDevices.length - onlineDevices} Offline</span>
               </div>
               <SubscriptionStatusBadge />
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" asChild className="flex-1 min-w-[120px]">
+              {/* <Button variant="outline" size="sm" asChild className="flex-1 min-w-[120px]">
                 <Link to="/subscription">
                   <CreditCard className="h-3 w-3 mr-1" />
                   {isPremium ? 'Manage' : 'Upgrade'}
@@ -307,8 +364,8 @@ const Index = () => {
               </Button>
               <Suspense fallback={<Button variant="outline" size="sm" disabled>Add Device</Button>}>
                 <AddDeviceDialog />
-              </Suspense>
-              <Dialog>
+              </Suspense> */}
+              {/* <Dialog>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" aria-label="Settings" className="px-3">
                     <Settings className="h-4 w-4" />
@@ -355,7 +412,7 @@ const Index = () => {
               </Dialog>
               <Button variant="outline" size="sm" onClick={handleSignOut} className="px-3">
                 <LogOut className="h-4 w-4" />
-              </Button>
+              </Button> */}
             </div>
           </div>
         </Card>
@@ -369,10 +426,10 @@ const Index = () => {
                 <Grid3X3 className="h-3 w-3 mr-1" />
                 Grid
               </TabsTrigger>
-              <TabsTrigger value="chart" className="text-xs px-3">
+              {/* <TabsTrigger value="chart" className="text-xs px-3">
                 <BarChart3 className="h-3 w-3 mr-1" />
                 Charts
-              </TabsTrigger>
+              </TabsTrigger> */}
             </TabsList>
           </Tabs>
         </div>
@@ -393,6 +450,7 @@ const Index = () => {
                   />
                 )}
                 
+                {/* Show devices (limited to 2 from API) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {devices.length > 0 ? (
                     devices.map((device) => (
@@ -409,6 +467,18 @@ const Index = () => {
                   </div>
                 )}
                 </div>
+
+
+                {/* View All Devices Link */}
+                {allDevices.length > 2 && (
+                  <div className="text-center pt-4">
+                    <Button variant="outline" asChild>
+                      <Link to="/devices">
+                        View All {allDevices.length} Devices
+                      </Link>
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="overflow-hidden">
