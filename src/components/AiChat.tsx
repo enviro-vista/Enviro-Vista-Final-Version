@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Bot, User, Send, Loader2, MessageSquare, Settings2, Trash2 } from 'lucide-react';
+import { Bot, User, Send, Loader2, MessageSquare, Settings2, Trash2, Lock } from 'lucide-react';
 import { useDevices } from '@/hooks/useDevices';
 import { useSensorReadings } from '@/hooks/useSensorReadings';
 import { 
@@ -16,9 +18,11 @@ import {
   useClearChatHistory,
   type ChatMessage 
 } from '@/hooks/useChatHistory';
+import { useSubscriptionStatus } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import UpgradePrompt from '@/components/UpgradePrompt';
 
 interface AiChatProps {
   className?: string;
@@ -28,6 +32,7 @@ interface AiChatProps {
 export default function AiChat({ className, compact = false }: AiChatProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [hasCheckedThisSession, setHasCheckedThisSession] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   // Hooks for data management
@@ -35,6 +40,7 @@ export default function AiChat({ className, compact = false }: AiChatProps) {
   const { data: sensorData = [] } = useSensorReadings('all');
   const { data: chatHistory = [], isLoading: loadingHistory } = useChatHistory();
   const { data: preferences } = useChatPreferences();
+  const { isPremium } = useSubscriptionStatus();
   const addMessageMutation = useAddChatMessage();
   const updatePreferencesMutation = useUpdateChatPreferences();
   const updateLastSuggestionMutation = useUpdateLastSuggestionTime();
@@ -56,13 +62,17 @@ export default function AiChat({ className, compact = false }: AiChatProps) {
   // Initialize with welcome message if no history exists
   useEffect(() => {
     if (!loadingHistory && chatHistory.length === 0) {
+      const welcomeMessage = isPremium 
+        ? "👋 Hi! I'm your agricultural AI assistant. I can analyze your sensor data and provide recommendations for optimal growing conditions. You can ask me questions anytime, or I'll automatically provide insights every 4 hours based on your sensor readings."
+        : "👋 Hi! I'm your agricultural AI assistant. I'll automatically analyze your sensor data and provide insights every 4 hours. Upgrade to premium to chat with me directly and get personalized recommendations!";
+      
       addMessageMutation.mutate({
         role: 'assistant',
-        content: "👋 Hi! I'm your agricultural AI assistant. I can analyze your sensor data and provide recommendations for optimal growing conditions. You can ask me questions anytime, or I'll automatically provide insights every 4 hours based on your sensor readings.",
+        content: welcomeMessage,
         context: 'auto_suggestion',
       });
     }
-  }, [loadingHistory, chatHistory.length]);
+  }, [loadingHistory, chatHistory.length, isPremium]);
 
   // Auto suggestion system
   useEffect(() => {
@@ -79,12 +89,22 @@ export default function AiChat({ className, compact = false }: AiChatProps) {
       }
     };
 
-    // Check immediately and then every hour
-    checkForAutoSuggestion();
+    // Only check after a delay and only if we haven't checked this session
+    // This prevents the function from being called immediately when the page loads
+    if (!hasCheckedThisSession) {
+      const initialDelay = setTimeout(() => {
+        checkForAutoSuggestion();
+        setHasCheckedThisSession(true);
+      }, 10000); // 10 second delay to ensure page is fully loaded
+
+      return () => clearTimeout(initialDelay);
+    }
+
+    // Then check every hour for subsequent checks
     const interval = setInterval(checkForAutoSuggestion, 60 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [autoSuggestionsEnabled, lastSuggestionTime, suggestionInterval, devices, sensorData]);
+  }, [autoSuggestionsEnabled, lastSuggestionTime, suggestionInterval, devices, sensorData, hasCheckedThisSession]);
 
   const aggregateSensorData = () => {
     if (!sensorData.length) return null;
@@ -139,6 +159,33 @@ export default function AiChat({ className, compact = false }: AiChatProps) {
   const generateAutoSuggestion = async () => {
     if (isLoading) return;
 
+    // Additional checks to prevent unnecessary AI calls
+    const now = Date.now();
+    const oneHourAgo = now - 60 * 60 * 1000;
+    
+    // Check for recent auto-suggestions
+    const recentAutoSuggestions = chatHistory.filter(msg => 
+      msg.role === 'assistant' && 
+      msg.context === 'auto_suggestion' &&
+      new Date(msg.created_at).getTime() > oneHourAgo
+    );
+
+    // Check for recent user activity (if user has been chatting recently, don't auto-suggest)
+    const recentUserMessages = chatHistory.filter(msg => 
+      msg.role === 'user' &&
+      new Date(msg.created_at).getTime() > oneHourAgo
+    );
+
+    if (recentAutoSuggestions.length > 0) {
+      console.log('Skipping auto-suggestion: recent suggestions already exist');
+      return;
+    }
+
+    if (recentUserMessages.length > 0) {
+      console.log('Skipping auto-suggestion: user has been actively chatting recently');
+      return;
+    }
+
     const aggregatedData = aggregateSensorData();
     if (!aggregatedData) return;
 
@@ -190,6 +237,16 @@ export default function AiChat({ className, compact = false }: AiChatProps) {
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
+
+    // Check if user is premium for chat functionality
+    if (!isPremium) {
+      toast({
+        title: "Premium Feature",
+        description: "Chat with AI is available for premium users only. Upgrade to start chatting!",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const userInput = input;
     setInput('');
@@ -250,6 +307,14 @@ export default function AiChat({ className, compact = false }: AiChatProps) {
   };
 
   const handleQuickInsight = () => {
+    if (!isPremium) {
+      toast({
+        title: "Premium Feature",
+        description: "Interactive AI insights are available for premium users only. Upgrade to start chatting!",
+        variant: "destructive",
+      });
+      return;
+    }
     setInput('What should I focus on right now?');
     sendMessage();
   };
@@ -278,7 +343,7 @@ export default function AiChat({ className, compact = false }: AiChatProps) {
               AI Assistant
             </CardTitle>
             <Badge variant="secondary" className="text-xs">
-              {autoSuggestionsEnabled ? 'Auto' : 'Manual'}
+              {isPremium ? (autoSuggestionsEnabled ? 'Auto' : 'Manual') : 'Free'}
             </Badge>
           </div>
         </CardHeader>
@@ -290,19 +355,27 @@ export default function AiChat({ className, compact = false }: AiChatProps) {
               'Monitoring your sensors...'
             )}
           </div>
-          <Button 
-            onClick={handleQuickInsight}
-            disabled={isLoading || loadingHistory}
-            className="w-full"
-            size="sm"
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Bot className="h-4 w-4 mr-2" />
-            )}
-            Get Current Insights
-          </Button>
+          {isPremium ? (
+            <Button 
+              onClick={handleQuickInsight}
+              disabled={isLoading || loadingHistory}
+              className="w-full"
+              size="sm"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Bot className="h-4 w-4 mr-2" />
+              )}
+              Get Current Insights
+            </Button>
+          ) : (
+            <UpgradePrompt 
+              title="Interactive AI Chat"
+              description="Get personalized agricultural insights and chat with our AI assistant"
+              compact={true}
+            />
+          )}
         </CardContent>
       </Card>
     );
@@ -317,25 +390,19 @@ export default function AiChat({ className, compact = false }: AiChatProps) {
             AI Agricultural Assistant
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Badge variant={autoSuggestionsEnabled ? "default" : "secondary"}>
-              {autoSuggestionsEnabled ? 'Auto-insights ON' : 'Manual mode'}
-            </Badge>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleAutoSuggestions}
-              title="Toggle auto-suggestions"
-            >
-              <Settings2 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearHistory}
-              title="Clear chat history"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            
+            {isPremium && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearHistory}
+                  title="Clear chat history"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -366,7 +433,7 @@ export default function AiChat({ className, compact = false }: AiChatProps) {
                     )}
                   </div>
                   <div className="flex-1 space-y-1">
-                    <div className="text-sm">{message.content}</div>
+                    <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(message.content) as string) }} />
                     <div className="text-xs text-muted-foreground">
                       {formatTime(message.created_at)}
                       {message.sensor_data && (
@@ -396,23 +463,38 @@ export default function AiChat({ className, compact = false }: AiChatProps) {
           )}
         </ScrollArea>
         
-        <div className="flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about your plants, sensors, or growing conditions..."
-            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-            // disabled={isLoading || loadingHistory}
-            disabled={true}
-          />
-          <Button 
-            onClick={sendMessage} 
-            disabled={!input.trim() || isLoading || loadingHistory}
-            size="icon"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+        {isPremium ? (
+          <div className="flex gap-2">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about your plants, sensors, or growing conditions..."
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+              disabled={isLoading || loadingHistory}
+            />
+            <Button 
+              onClick={sendMessage} 
+              disabled={!input.trim() || isLoading || loadingHistory}
+              size="icon"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border border-muted-foreground/20">
+              <Lock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                Interactive chat is available for premium users
+              </span>
+            </div>
+            <UpgradePrompt 
+              title="Unlock AI Chat"
+              description="Get personalized agricultural insights and chat with our AI assistant. Free users receive automatic insights every 4 hours."
+              compact={false}
+            />
+          </div>
+        )}
         
         {lastSuggestionTime && autoSuggestionsEnabled && (
           <div className="text-xs text-muted-foreground text-center">

@@ -21,6 +21,7 @@ import { useSubscriptionStatus } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { useFavoriteDevices } from '@/hooks/useDevices';
 import {
   Home,
   CreditCard,
@@ -47,6 +48,7 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const location = useLocation();
   const { setOpenMobile, isMobile } = useSidebar();
+  const { data: favoriteDevices = [] } = useFavoriteDevices();
 
   // Check if user is admin
   useEffect(() => {
@@ -102,6 +104,12 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
       href: '/profile',
       icon: User,
       description: 'Account settings and security'
+    },
+    {
+      name: 'Notifications',
+      href: '/notifications',
+      icon: Bell,
+      description: 'Notifications'
     },
     {
       name: 'Subscription',
@@ -205,6 +213,34 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
 
         <SidebarSeparator />
 
+        {/* Favorites */}
+        {favoriteDevices.length > 0 && (
+          <>
+            <SidebarGroup>
+              <SidebarGroupLabel>Favorites</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {favoriteDevices.map((d: any) => (
+                    <SidebarMenuItem key={d.id}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isCurrentPage(`/devices/${d.id}`)}
+                        tooltip={d.name}
+                      >
+                        <Link to={`/devices/${d.id}`} onClick={handleNavigate}>
+                          <BarChart3 className="h-5 w-5" />
+                          <span className="truncate">{d.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+            <SidebarSeparator />
+          </>
+        )}
+
         {/* Account Navigation */}
         <SidebarGroup>
           <SidebarGroupLabel>Account</SidebarGroupLabel>
@@ -262,16 +298,22 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
         <SidebarMenu>
           {/* Quick Actions */}
           <SidebarMenuItem>
-            <div className="flex items-center justify-between px-2 py-1">
-              <span className="text-xs text-sidebar-foreground/70">Theme</span>
+            <div className="flex items-center justify-between px-3 py-2 bg-sidebar-accent/50 rounded-md">
+              <span className="text-sm font-medium text-sidebar-foreground">Theme</span>
               <ThemeToggle />
             </div>
           </SidebarMenuItem>
           
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Notifications">
-              <Bell className="h-5 w-5" />
-              <span>Notifications</span>
+            <SidebarMenuButton 
+              asChild
+              isActive={isCurrentPage('/notifications/settings')}
+              tooltip="Notification Settings"
+            >
+              <Link to="/notifications/settings" onClick={handleNavigate}>
+                <Bell className="h-5 w-5" />
+                <span>Notifications Settings</span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           

@@ -6,49 +6,89 @@ export interface Reading {
   id: string;
   device_id: string;
   timestamp: string;
-  temperature: number;
-  humidity: number;
-  pressure: number;
-  dew_point: number;
+  temperature?: number;
+  humidity?: number;
+  pressure?: number;
+  dew_point?: number;
+  co2?: number;
+  light_veml7700?: number;
+  light_tsl2591?: number;
+  acceleration_x?: number;
+  acceleration_y?: number;
+  acceleration_z?: number;
+  soil_capacitance?: number;
+  battery_voltage?: number;
+  battery_percentage?: number;
+  wet_bulb_temp?: number;
+  heat_index?: number;
+  vpd?: number;
+  absolute_humidity?: number;
+  altitude?: number;
+  weather_trend?: string;
+  par?: number;
+  soil_moisture_percentage?: number;
+  battery_health?: number;
+  shock_detected?: boolean;
   created_at: string;
 }
 
-export const useReadings = (deviceId?: string, timeRange: string = '24h') => {
+export interface DateRange {
+  from: Date | undefined;
+  to: Date | undefined;
+}
+
+export const useReadings = (
+  deviceId?: string, 
+  timeRange: string = '24h',
+  customDateRange?: DateRange
+) => {
   return useQuery({
-    queryKey: ['readings', deviceId, timeRange],
+    queryKey: ['readings', deviceId, timeRange, customDateRange],
     queryFn: async () => {
-      let query = supabase
-        .from('readings')
-        .select('*')
-        .order('timestamp', { ascending: true });
-
-      // Filter by device if specified
-      if (deviceId && deviceId !== 'all') {
-        query = query.eq('device_id', deviceId);
-      }
-
-      // Filter by time range
-      const now = new Date();
-      let startTime = new Date();
+      // Get the current user's session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
       
-      switch (timeRange) {
-        case '24h':
-          startTime.setHours(now.getHours() - 24);
-          break;
-        case '7d':
-          startTime.setDate(now.getDate() - 7);
-          break;
-        case '30d':
-          startTime.setDate(now.getDate() - 30);
-          break;
+      if (!session) {
+        throw new Error('No active session');
       }
 
-      query = query.gte('timestamp', startTime.toISOString());
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (deviceId && deviceId !== 'all') {
+        params.append('device_id', deviceId);
+      }
+      params.append('time_range', timeRange);
+      params.append('limit', '1000');
 
-      const { data, error } = await query;
+      // Add custom date range if provided
+      if (customDateRange?.from && customDateRange?.to) {
+        params.append('start_date', customDateRange.from.toISOString());
+        params.append('end_date', customDateRange.to.toISOString());
+      }
 
-      if (error) throw error;
-      return data as Reading[];
+      // Call the fetch-readings function with GET request
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-readings?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch readings');
+      }
+
+      const result = await response.json();
+      return result.data as Reading[];
     },
+    staleTime: 30 * 1000, // Consider data fresh for 30 seconds
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
+    retry: 2, // Retry failed requests twice
+    retryDelay: 1000, // Wait 1 second between retries
   });
 };

@@ -10,6 +10,8 @@ export interface Device {
   device_type: 'AIR' | 'SOIL';
   crop_type?: string | null;
   owner_id: string;
+  apikey: string;
+  favorite?: boolean;
   created_at: string;
   updated_at: string;
   latest_reading?: {
@@ -25,27 +27,33 @@ export const useDevices = () => {
   return useQuery({
     queryKey: ['devices'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: devices, error: devicesError } = await (supabase
         .from('devices')
-        .select(`
-          *,
-          readings!readings_device_id_fkey (
-            temperature,
-            humidity,
-            pressure,
-            dew_point,
-            timestamp
-          )
-        `)
+        .select('*') as any)
         .order('created_at', { ascending: false })
         .limit(2); // Limit to 2 devices for dashboard
 
-      if (error) throw error;
+      if (devicesError) throw devicesError;
 
-      return data.map(device => ({
-        ...device,
-        latest_reading: device.readings?.[0] || null
-      }));
+      // Get latest readings for each device from sensor_readings table
+      const devicesWithReadings = await Promise.all(
+        devices.map(async (device) => {
+          const { data: latestReading, error: readingsError } = await (supabase
+            .from('sensor_readings')
+            .select('temperature, humidity, pressure, dew_point, timestamp')
+            .eq('device_id', device.id)
+            .order('timestamp', { ascending: false })
+            .limit(1)
+            .maybeSingle() as any);
+
+          return {
+            ...device,
+            latest_reading: readingsError ? null : latestReading
+          };
+        })
+      );
+
+      return devicesWithReadings;
     },
   });
 };
@@ -55,26 +63,79 @@ export const useAllDevices = () => {
   return useQuery({
     queryKey: ['all-devices'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: devices, error: devicesError } = await (supabase
         .from('devices')
-        .select(`
-          *,
-          readings!readings_device_id_fkey (
-            temperature,
-            humidity,
-            pressure,
-            dew_point,
-            timestamp
-          )
-        `)
+        .select('*') as any)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (devicesError) throw devicesError;
 
-      return data.map(device => ({
-        ...device,
-        latest_reading: device.readings?.[0] || null
-      }));
+      // Get latest readings for each device from sensor_readings table
+      const devicesWithReadings = await Promise.all(
+        devices.map(async (device) => {
+          const { data: latestReading, error: readingsError } = await (supabase
+            .from('sensor_readings')
+            .select('temperature, humidity, pressure, dew_point, timestamp')
+            .eq('device_id', device.id)
+            .order('timestamp', { ascending: false })
+            .limit(1)
+            .maybeSingle() as any);
+
+          return {
+            ...device,
+            latest_reading: readingsError ? null : latestReading
+          };
+        })
+      );
+
+      return devicesWithReadings;
+    },
+  });
+};
+
+// Favorite devices list
+export const useFavoriteDevices = () => {
+  const fetchFavoriteDevices = async () => {
+    const sb: any = supabase as any;
+    const { data, error } = await sb
+      .from('devices')
+      .select('*')
+      .eq('favorite', true)
+      .order('updated_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  };
+
+  return useQuery({
+    queryKey: ['favorite-devices'],
+    queryFn: fetchFavoriteDevices,
+  });
+};
+
+// Toggle favorite mutation
+export const useToggleFavorite = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, favorite }: { id: string; favorite: boolean }) => {
+      const { data, error } = await supabase
+        .from('devices')
+        .update({ favorite } as any)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
+      queryClient.invalidateQueries({ queryKey: ['all-devices'] });
+      queryClient.invalidateQueries({ queryKey: ['favorite-devices'] });
+      toast({ title: 'Updated', description: 'Favorite updated' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to update favorite', variant: 'destructive' });
     },
   });
 };

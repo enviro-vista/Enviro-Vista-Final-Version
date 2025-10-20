@@ -66,7 +66,7 @@ const Devices = () => {
         <Card className="glass-card p-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
-                {/*
+                
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -76,10 +76,10 @@ const Devices = () => {
                   className="pl-10"
                 />
               </div>
-              */}
+             
             </div>
             <div className="flex gap-2">
-              {/*<Select value={deviceTypeFilter} onValueChange={setDeviceTypeFilter}>
+              <Select value={deviceTypeFilter} onValueChange={setDeviceTypeFilter}>
                 <SelectTrigger className="w-[140px]">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Filter by type" />
@@ -89,7 +89,7 @@ const Devices = () => {
                   <SelectItem value="AIR">Air Sensors</SelectItem>
                   <SelectItem value="SOIL">Soil Sensors</SelectItem>
                 </SelectContent>
-              </Select>*/}
+              </Select>
               <Suspense fallback={<Button disabled><Plus className="h-4 w-4 mr-2" />Add Device</Button>}>
                 <AddDeviceDialog />
               </Suspense>

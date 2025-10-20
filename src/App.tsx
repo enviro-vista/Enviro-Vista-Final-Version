@@ -9,11 +9,14 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import Devices from "./pages/Devices";
+import DeviceDetails from "./pages/DeviceDetails";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
 import SubscriptionPage from "./components/SubscriptionPage";
 import BillingPage from "./components/BillingPage";
+import NotificationSettings from "./pages/NotificationSettings";
+import Notifications from "./pages/Notifications";
 
 const queryClient = new QueryClient();
 
@@ -69,6 +72,12 @@ const AppRoutes = () => {
           <Devices />
         </ProtectedRoute>
       } />
+
+      <Route path="/devices/:id" element={
+        <ProtectedRoute>
+          <DeviceDetails />
+        </ProtectedRoute>
+      } />
       
       <Route path="/profile" element={
         <ProtectedRoute>
@@ -85,6 +94,18 @@ const AppRoutes = () => {
       <Route path="/billing" element={
         <ProtectedRoute>
           <BillingPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/notifications" element={
+        <ProtectedRoute>
+          <Notifications />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/notifications/settings" element={
+        <ProtectedRoute>
+          <NotificationSettings />
         </ProtectedRoute>
       } />
       

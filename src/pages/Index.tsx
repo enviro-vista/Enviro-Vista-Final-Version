@@ -75,7 +75,15 @@ const Index = () => {
       };
     }
 
-    const devicesWithReadings = allDevices.filter(device => device.latest_reading);
+    // Filter devices that have valid readings with actual numeric values
+    const devicesWithReadings = allDevices.filter(device => 
+      device.latest_reading && 
+      device.latest_reading.temperature != null &&
+      device.latest_reading.humidity != null &&
+      device.latest_reading.pressure != null &&
+      device.latest_reading.dew_point != null
+    );
+
     if (devicesWithReadings.length === 0) {
       return {
         temperature: 0,
@@ -85,12 +93,34 @@ const Index = () => {
       };
     }
 
-    return {
-      temperature: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.temperature || 0), 0) / devicesWithReadings.length,
-      humidity: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.humidity || 0), 0) / devicesWithReadings.length,
-      pressure: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.pressure || 0), 0) / devicesWithReadings.length,
-      dewPoint: devicesWithReadings.reduce((sum, device) => sum + (device.latest_reading?.dew_point || 0), 0) / devicesWithReadings.length,
+    // Calculate averages only from devices with valid readings
+    const temperatureSum = devicesWithReadings.reduce((sum, device) => sum + device.latest_reading.temperature, 0);
+    const humiditySum = devicesWithReadings.reduce((sum, device) => sum + device.latest_reading.humidity, 0);
+    const pressureSum = devicesWithReadings.reduce((sum, device) => sum + device.latest_reading.pressure, 0);
+    const dewPointSum = devicesWithReadings.reduce((sum, device) => sum + device.latest_reading.dew_point, 0);
+
+    const averages = {
+      temperature: temperatureSum / devicesWithReadings.length,
+      humidity: humiditySum / devicesWithReadings.length,
+      pressure: pressureSum / devicesWithReadings.length,
+      dewPoint: dewPointSum / devicesWithReadings.length,
     };
+
+    // Debug logging
+    console.log('Average calculation debug:', {
+      totalDevices: allDevices.length,
+      devicesWithReadings: devicesWithReadings.length,
+      devicesWithReadingsData: devicesWithReadings.map(d => ({
+        name: d.name,
+        temperature: d.latest_reading?.temperature,
+        humidity: d.latest_reading?.humidity,
+        pressure: d.latest_reading?.pressure,
+        dew_point: d.latest_reading?.dew_point
+      })),
+      averages
+    });
+
+    return averages;
   }, [allDevices]);
 
   // Memoized calculation of online devices using all devices
@@ -437,6 +467,12 @@ const Index = () => {
         {/* Main Content Layout - Split between devices and AI chat */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Main content area - takes 2/3 of space on large screens */}
+          {/* AI Chat Section - takes 1/3 of space on large screens, full width on smaller */}
+          <div className="xl:col-span-1">
+            <Suspense fallback={<div className="bg-muted rounded-lg h-96 animate-pulse"></div>}>
+              <AiChat className="h-fit" />
+            </Suspense>
+          </div>
           <div className="xl:col-span-2 space-y-4">
             {activeView === 'grid' ? (
               <div className="space-y-4">
@@ -489,12 +525,7 @@ const Index = () => {
             )}
           </div>
 
-          {/* AI Chat Section - takes 1/3 of space on large screens, full width on smaller */}
-          <div className="xl:col-span-1">
-            <Suspense fallback={<div className="bg-muted rounded-lg h-96 animate-pulse"></div>}>
-              <AiChat className="h-fit" />
-            </Suspense>
-          </div>
+          
         </div>
       </div>
     </AppLayout>

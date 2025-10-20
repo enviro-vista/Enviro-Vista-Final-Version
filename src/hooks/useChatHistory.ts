@@ -115,7 +115,7 @@ export const useUpdateChatPreferences = () => {
         .upsert([{
           user_id: user.id,
           ...preferences,
-        }])
+        }], { onConflict: 'user_id' })
         .select()
         .single();
 
@@ -164,7 +164,7 @@ export const useUpdateLastSuggestionTime = () => {
         .upsert([{
           user_id: user.id,
           last_auto_suggestion: new Date().toISOString(),
-        }]);
+        }], { onConflict: 'user_id' });
 
       if (error) throw error;
     },

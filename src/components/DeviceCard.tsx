@@ -11,7 +11,10 @@ import {
   WifiOff,
   Trash,
   Pencil,
-  RefreshCw
+  RefreshCw,
+  Key,
+  Copy,
+  Star
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Device } from "@/hooks/useDevices";
@@ -23,7 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useDeleteDevice } from "@/hooks/useDevices";
+import { useDeleteDevice, useToggleFavorite } from "@/hooks/useDevices";
 import EditDeviceDialog from "./EditDeviceDialog";
 
 interface DeviceCardProps {
@@ -36,6 +39,7 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
   const deleteDevice = useDeleteDevice();
+  const toggleFavorite = useToggleFavorite();
   
   const isOnline = device.latest_reading ? (() => {
     const lastReading = new Date(device.latest_reading.timestamp);
@@ -75,6 +79,22 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
     });
   };
 
+  const handleCopyApiKey = async () => {
+    try {
+      await navigator.clipboard.writeText(device.apikey);
+      toast({
+        title: "API Key Copied",
+        description: "Device API key has been copied to clipboard.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to copy API key to clipboard.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <>
       <Card className="glass-card p-6 group hover:shadow-lg transition-all duration-300 animate-fade-in">
@@ -91,9 +111,28 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
                   🌾 {device.crop_type}
                 </Badge>
               )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopyApiKey}
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                title="Copy API Key"
+              >
+                <Key className="h-3 w-3 mr-1" />
+                API Key
+              </Button>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant={device.favorite ? 'default' : 'ghost'}
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => toggleFavorite.mutate({ id: device.id, favorite: !device.favorite })}
+              title={device.favorite ? 'Unfavorite' : 'Mark as favorite'}
+            >
+              <Star className={`h-4 w-4 ${device.favorite ? '' : 'text-muted-foreground'}`} />
+            </Button>
             <Badge className={isOnline ? "bg-green-500/20 text-green-500" : "bg-red-500/20 text-red-500"}>
               {isOnline ? (
                 <>
@@ -119,6 +158,10 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
                   <Pencil className="h-4 w-4 mr-2" />
                   Rename Device
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCopyApiKey}>
+                  <Key className="h-4 w-4 mr-2" />
+                  Copy API Key
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleRefresh} disabled={isRefreshing}>
                   <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                   {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
@@ -143,7 +186,7 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Temp</p>
-                <p className="font-semibold">{device.latest_reading.temperature.toFixed(1)}°C</p>
+                <p className="font-semibold">{device.latest_reading.temperature != null ? device.latest_reading.temperature.toFixed(1) : '-' }°C</p>
               </div>
             </div>
 
@@ -153,7 +196,7 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Humidity</p>
-                <p className="font-semibold">{device.latest_reading.humidity.toFixed(1)}%</p>
+                <p className="font-semibold">{device.latest_reading.humidity != null ? device.latest_reading.humidity.toFixed(1) : '-' }%</p>
               </div>
             </div>
 
@@ -163,7 +206,7 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Pressure</p>
-                <p className="font-semibold">{device.latest_reading.pressure.toFixed(0)} hPa</p>
+                <p className="font-semibold">{device.latest_reading.pressure != null ? device.latest_reading.pressure.toFixed(0) : '-' } hPa</p>
               </div>
             </div>
 
@@ -173,7 +216,7 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Dew Point</p>
-                <p className="font-semibold">{device.latest_reading.dew_point.toFixed(1)}°C</p>
+                <p className="font-semibold">{device.latest_reading.dew_point != null ? device.latest_reading.dew_point.toFixed(1) : '-' }°C</p>
               </div>
             </div>
           </div>

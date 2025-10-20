@@ -35,15 +35,40 @@ export const useSensorReadings = (deviceId?: string, timeRange: string = '24h') 
   return useQuery({
     queryKey: ['sensor-readings', deviceId, timeRange],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('fetch-readings', {
-        body: {},
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Get the current user's session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No active session');
+      }
 
-      if (error) throw error;
-      return data.data as SensorReading[];
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (deviceId && deviceId !== 'all') {
+        params.append('device_id', deviceId);
+      }
+      params.append('time_range', timeRange);
+      params.append('limit', '1000'); // Increase limit for better data
+
+      // Call the fetch-readings function with GET request
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-readings?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch readings');
+      }
+
+      const result = await response.json();
+      return result.data as SensorReading[];
     },
     enabled: !!deviceId || deviceId === 'all',
   });

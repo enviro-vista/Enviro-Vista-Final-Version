@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import NotificationDropdown from '@/components/NotificationDropdown';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -96,20 +97,25 @@ export function AppLayout({ children, title, subtitle, breadcrumbs }: AppLayoutP
             </Breadcrumb>
           )}
           
-          {(title || subtitle) && (
-            <div className="ml-auto hidden sm:block">
-              {title && <h1 className="text-lg font-semibold">{title}</h1>}
-              {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
-            </div>
-          )}
-          
-          {/* Status check indicator */}
-          {isCheckingStatus && (
-            <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Checking account status...</span>
-            </div>
-          )}
+          <div className="ml-auto flex items-center gap-3">
+            {(title || subtitle) && (
+              <div className="hidden sm:block">
+                {title && <h1 className="text-lg font-semibold">{title}</h1>}
+                {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+              </div>
+            )}
+            
+            {/* Status check indicator */}
+            {isCheckingStatus && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="hidden sm:inline">Checking account status...</span>
+              </div>
+            )}
+            
+            {/* Notification dropdown */}
+            <NotificationDropdown />
+          </div>
         </header>
         
         {/* Main content */}

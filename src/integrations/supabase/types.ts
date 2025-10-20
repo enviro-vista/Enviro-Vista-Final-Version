@@ -224,6 +224,119 @@ export type Database = {
           },
         ]
       }
+      ai_scheduler_log: {
+        Row: {
+          device_count: number | null
+          error_message: string | null
+          executed_at: string
+          execution_time_ms: number | null
+          id: string
+          success: boolean
+          tokens_used: number | null
+        }
+        Insert: {
+          device_count?: number | null
+          error_message?: string | null
+          executed_at?: string
+          execution_time_ms?: number | null
+          id?: string
+          success?: boolean
+          tokens_used?: number | null
+        }
+        Update: {
+          device_count?: number | null
+          error_message?: string | null
+          executed_at?: string
+          execution_time_ms?: number | null
+          id?: string
+          success?: boolean
+          tokens_used?: number | null
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          device_id: string | null
+          id: string
+          is_read: boolean
+          message: string
+          reading_type: string | null
+          reading_value: number | null
+          threshold_type: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          is_read?: boolean
+          message: string
+          reading_type?: string | null
+          reading_value?: number | null
+          threshold_type?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          is_read?: boolean
+          message?: string
+          reading_type?: string | null
+          reading_value?: number | null
+          threshold_type?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_settings: {
+        Row: {
+          created_at: string
+          id: string
+          is_enabled: boolean
+          max_threshold: number | null
+          min_threshold: number | null
+          reading_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          max_threshold?: number | null
+          min_threshold?: number | null
+          reading_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          max_threshold?: number | null
+          min_threshold?: number | null
+          reading_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -361,6 +474,38 @@ export type Database = {
       is_premium: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      get_unread_notification_count: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      mark_notification_read: {
+        Args: {
+          notification_id: string
+        }
+        Returns: undefined
+      }
+      mark_all_notifications_read: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      log_ai_scheduler_execution: {
+        Args: {
+          p_success: boolean
+          p_device_count?: number
+          p_tokens_used?: number
+          p_error_message?: string
+          p_execution_time_ms?: number
+        }
+        Returns: string
+      }
+      should_run_ai_scheduler: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      trigger_ai_scheduler: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
     }
     Enums: {
