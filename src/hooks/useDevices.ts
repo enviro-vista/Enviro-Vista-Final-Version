@@ -15,11 +15,15 @@ export interface Device {
   created_at: string;
   updated_at: string;
   latest_reading?: {
-    temperature: number;
-    humidity: number;
-    pressure: number;
-    dew_point: number;
+    temperature?: number;
+    humidity?: number;
+    pressure?: number;
+    dew_point?: number;
     timestamp: string;
+    soil_temperature?: number;
+    soil_moisture_percentage?: number;
+    battery_voltage?: number;
+    battery_percentage?: number;
   };
 }
 
@@ -40,7 +44,7 @@ export const useDevices = () => {
         devices.map(async (device) => {
           const { data: latestReading, error: readingsError } = await (supabase
             .from('sensor_readings')
-            .select('temperature, humidity, pressure, dew_point, timestamp')
+            .select('temperature, humidity, pressure, dew_point, timestamp, soil_temperature, soil_moisture_percentage, battery_voltage, battery_percentage')
             .eq('device_id', device.id)
             .order('timestamp', { ascending: false })
             .limit(1)
@@ -75,7 +79,7 @@ export const useAllDevices = () => {
         devices.map(async (device) => {
           const { data: latestReading, error: readingsError } = await (supabase
             .from('sensor_readings')
-            .select('temperature, humidity, pressure, dew_point, timestamp')
+            .select('temperature, humidity, pressure, dew_point, timestamp, soil_temperature, soil_moisture_percentage, battery_voltage, battery_percentage')
             .eq('device_id', device.id)
             .order('timestamp', { ascending: false })
             .limit(1)

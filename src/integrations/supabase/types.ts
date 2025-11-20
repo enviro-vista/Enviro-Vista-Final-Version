@@ -147,6 +147,7 @@ export type Database = {
           shock_detected: boolean | null
           soil_capacitance: number | null
           soil_moisture_percentage: number | null
+          soil_temperature: number | null
           temperature: number | null
           timestamp: string
           uv_index: number | null
@@ -384,6 +385,7 @@ export type Database = {
           shock_detected: boolean | null
           soil_capacitance: number | null
           soil_moisture_percentage: number | null
+          soil_temperature: number | null
           temperature: number | null
           timestamp: string | null
           vpd: number | null

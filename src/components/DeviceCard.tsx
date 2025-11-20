@@ -14,7 +14,9 @@ import {
   RefreshCw,
   Key,
   Copy,
-  Star
+  Star,
+  Battery,
+  Zap
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Device } from "@/hooks/useDevices";
@@ -180,45 +182,93 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
 
         {device.latest_reading ? (
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded temp-gradient text-white">
-                <Thermometer className="h-3 w-3" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Temp</p>
-                <p className="font-semibold">{device.latest_reading.temperature != null ? device.latest_reading.temperature.toFixed(1) : '-' }°C</p>
-              </div>
-            </div>
+            {device.device_type === 'SOIL' ? (
+              <>
+                {/* Soil Device - Show soil_temperature, battery_percentage, humidity, battery_voltage */}
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded temp-gradient text-white">
+                    <Thermometer className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Soil Temp</p>
+                    <p className="font-semibold">{device.latest_reading.soil_temperature != null ? device.latest_reading.soil_temperature.toFixed(1) : '-' }°C</p>
+                  </div>
+                </div>
 
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded humidity-gradient text-white">
-                <Droplets className="h-3 w-3" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Humidity</p>
-                <p className="font-semibold">{device.latest_reading.humidity != null ? device.latest_reading.humidity.toFixed(1) : '-' }%</p>
-              </div>
-            </div>
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+                    <Battery className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Battery</p>
+                    <p className="font-semibold">{device.latest_reading.battery_percentage != null ? device.latest_reading.battery_percentage.toFixed(0) : '-' }%</p>
+                  </div>
+                </div>
 
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded pressure-gradient text-white">
-                <Gauge className="h-3 w-3" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Pressure</p>
-                <p className="font-semibold">{device.latest_reading.pressure != null ? device.latest_reading.pressure.toFixed(0) : '-' } hPa</p>
-              </div>
-            </div>
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded humidity-gradient text-white">
+                    <Droplets className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Humidity</p>
+                    <p className="font-semibold">{device.latest_reading.humidity != null ? device.latest_reading.humidity.toFixed(1) : '-' }%</p>
+                  </div>
+                </div>
 
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded dewpoint-gradient text-white">
-                <Cloud className="h-3 w-3" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Dew Point</p>
-                <p className="font-semibold">{device.latest_reading.dew_point != null ? device.latest_reading.dew_point.toFixed(1) : '-' }°C</p>
-              </div>
-            </div>
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded bg-gradient-to-br from-yellow-500 to-orange-600 text-white">
+                    <Zap className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Voltage</p>
+                    <p className="font-semibold">{device.latest_reading.battery_voltage != null ? device.latest_reading.battery_voltage.toFixed(2) : '-' }V</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Air Device - Keep original sensors */}
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded temp-gradient text-white">
+                    <Thermometer className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Temp</p>
+                    <p className="font-semibold">{device.latest_reading.temperature != null ? device.latest_reading.temperature.toFixed(1) : '-' }°C</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded humidity-gradient text-white">
+                    <Droplets className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Humidity</p>
+                    <p className="font-semibold">{device.latest_reading.humidity != null ? device.latest_reading.humidity.toFixed(1) : '-' }%</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded pressure-gradient text-white">
+                    <Gauge className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Pressure</p>
+                    <p className="font-semibold">{device.latest_reading.pressure != null ? device.latest_reading.pressure.toFixed(0) : '-' } hPa</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded dewpoint-gradient text-white">
+                    <Cloud className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Dew Point</p>
+                    <p className="font-semibold">{device.latest_reading.dew_point != null ? device.latest_reading.dew_point.toFixed(1) : '-' }°C</p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="mb-4 text-center py-8">

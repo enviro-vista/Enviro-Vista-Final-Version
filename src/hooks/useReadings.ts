@@ -27,6 +27,7 @@ export interface Reading {
   weather_trend?: string;
   par?: number;
   soil_moisture_percentage?: number;
+  soil_temperature?: number;
   battery_health?: number;
   shock_detected?: boolean;
   created_at: string;
