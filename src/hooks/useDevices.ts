@@ -214,6 +214,28 @@ export const useDeleteDevice = () => {
   });
 };
 
+// Validate device ID against available_devices table
+export const useValidateDeviceId = () => {
+  return useMutation({
+    mutationFn: async (deviceId: string) => {
+      const { data, error } = await supabase
+        .from('available_devices')
+        .select('qr_code, mac_address, is_used')
+        .or(`qr_code.eq.${deviceId},mac_address.eq.${deviceId}`)
+        .maybeSingle();
+
+      if (error) throw error;
+      
+      // Device is valid only if it exists AND has not been used
+      return {
+        isValid: !!data && !data.is_used,
+        isUsed: data?.is_used || false,
+        device: data
+      };
+    },
+  });
+};
+
 export const useAddDevice = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -225,6 +247,25 @@ export const useAddDevice = () => {
       
       if (authError || !user) {
         throw authError || new Error('User not authenticated');
+      }
+
+      // Validate device ID against available_devices table
+      const { data: availableDevice, error: validationError } = await supabase
+        .from('available_devices')
+        .select('id, qr_code, mac_address, is_used')
+        .or(`qr_code.eq.${device_id},mac_address.eq.${device_id}`)
+        .maybeSingle();
+
+      if (validationError) {
+        throw new Error('Failed to validate device ID');
+      }
+
+      if (!availableDevice) {
+        throw new Error('Invalid device ID. Please check your QR code or MAC address.');
+      }
+
+      if (availableDevice.is_used) {
+        throw new Error('This device has already been registered. Please contact support if you believe this is an error.');
       }
 
       // Prepare insert data
@@ -242,6 +283,18 @@ export const useAddDevice = () => {
 
       if (insertError) {
         throw insertError;
+      }
+
+      // Mark device as used in available_devices table
+      const { error: updateError } = await supabase
+        .from('available_devices')
+        .update({ is_used: true } as any)
+        .eq('id', availableDevice.id);
+
+      if (updateError) {
+        console.error('Failed to mark device as used:', updateError);
+        // Don't throw error here - device is already registered
+        // This is just a flag update
       }
 
       // Generate JWT token client-side

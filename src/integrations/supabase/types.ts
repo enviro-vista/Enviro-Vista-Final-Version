@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      available_devices: {
+        Row: {
+          id: string
+          qr_code: string
+          mac_address: string
+          is_used: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          qr_code: string
+          mac_address: string
+          is_used?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          qr_code?: string
+          mac_address?: string
+          is_used?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       devices: {
         Row: {
           created_at: string | null
