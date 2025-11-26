@@ -14,16 +14,18 @@ const AddDeviceDialog = () => {
   const [deviceType, setDeviceType] = useState<'AIR' | 'SOIL'>('AIR');
   const [cropType, setCropType] = useState<string>('');
   const [deviceToken, setDeviceToken] = useState<string | null>(null);
-  const [validationResult, setValidationResult] = useState<{ isValid: boolean; checked: boolean; isUsed?: boolean } | null>(null);
+  const [validationResult, setValidationResult] = useState<{ isValid: boolean; checked: boolean; isUsed?: boolean; macAddress?: string | null } | null>(null);
   
   const addDevice = useAddDevice();
   const validateDeviceId = useValidateDeviceId();
   const { data: existingDevices } = useDevices();
   
-  // Check if device ID is already taken
-  const isDeviceIdTaken = existingDevices?.some(device => 
-    device.device_id.toLowerCase() === deviceId.toLowerCase()
-  );
+  // Check if device MAC address is already taken (compare with MAC address from validation)
+  const isDeviceIdTaken = validationResult?.macAddress 
+    ? existingDevices?.some(device => 
+        device.device_id.toLowerCase() === validationResult.macAddress?.toLowerCase()
+      )
+    : false;
 
   // Validate device ID when user stops typing
   useEffect(() => {
@@ -38,7 +40,8 @@ const AddDeviceDialog = () => {
         setValidationResult({ 
           isValid: result.isValid, 
           checked: true,
-          isUsed: result.isUsed 
+          isUsed: result.isUsed,
+          macAddress: result.macAddress
         });
       } catch (error) {
         setValidationResult({ isValid: false, checked: true });

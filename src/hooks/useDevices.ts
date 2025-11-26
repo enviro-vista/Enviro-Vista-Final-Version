@@ -230,6 +230,7 @@ export const useValidateDeviceId = () => {
       return {
         isValid: !!data && !data.is_used,
         isUsed: data?.is_used || false,
+        macAddress: data?.mac_address || null,
         device: data
       };
     },
@@ -268,8 +269,13 @@ export const useAddDevice = () => {
         throw new Error('This device has already been registered. Please contact support if you believe this is an error.');
       }
 
-      // Prepare insert data
-      const insertData: any = { device_id, name, device_type, owner_id: user.id };
+      // Prepare insert data - use MAC address as device_id
+      const insertData: any = { 
+        device_id: availableDevice.mac_address, 
+        name, 
+        device_type, 
+        owner_id: user.id 
+      };
       if (crop_type) {
         insertData.crop_type = crop_type;
       }
