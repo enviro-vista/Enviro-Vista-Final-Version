@@ -24,6 +24,8 @@ export interface Device {
     soil_moisture_percentage?: number;
     battery_voltage?: number;
     battery_percentage?: number;
+    co2?: number;
+    par?: number;
   };
 }
 
@@ -44,7 +46,7 @@ export const useDevices = () => {
         devices.map(async (device) => {
           const { data: latestReading, error: readingsError } = await (supabase
             .from('sensor_readings')
-            .select('temperature, humidity, pressure, dew_point, timestamp, soil_temperature, soil_moisture_percentage, battery_voltage, battery_percentage')
+            .select('temperature, humidity, pressure, dew_point, timestamp, soil_temperature, soil_moisture_percentage, battery_voltage, battery_percentage, co2, par')
             .eq('device_id', device.id)
             .order('timestamp', { ascending: false })
             .limit(1)
@@ -79,7 +81,7 @@ export const useAllDevices = () => {
         devices.map(async (device) => {
           const { data: latestReading, error: readingsError } = await (supabase
             .from('sensor_readings')
-            .select('temperature, humidity, pressure, dew_point, timestamp, soil_temperature, soil_moisture_percentage, battery_voltage, battery_percentage')
+            .select('temperature, humidity, pressure, dew_point, timestamp, soil_temperature, soil_moisture_percentage, battery_voltage, battery_percentage, co2, par')
             .eq('device_id', device.id)
             .order('timestamp', { ascending: false })
             .limit(1)

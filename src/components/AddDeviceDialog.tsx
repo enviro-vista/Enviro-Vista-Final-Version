@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Plus, Loader2, AlertTriangle, CheckCircle2, ScanLine, X } from 'lucide-react';
 import { useAddDevice, useDevices, useValidateDeviceId } from '@/hooks/useDevices';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const AddDeviceDialog = () => {
   const [open, setOpen] = useState(false);
@@ -15,10 +16,13 @@ const AddDeviceDialog = () => {
   const [cropType, setCropType] = useState<string>('');
   const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const [validationResult, setValidationResult] = useState<{ isValid: boolean; checked: boolean; isUsed?: boolean; macAddress?: string | null } | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   
   const addDevice = useAddDevice();
   const validateDeviceId = useValidateDeviceId();
   const { data: existingDevices } = useDevices();
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   
   // Check if device MAC address is already taken (compare with MAC address from validation)
   const isDeviceIdTaken = validationResult?.macAddress 
@@ -50,6 +54,87 @@ const AddDeviceDialog = () => {
 
     return () => clearTimeout(timer);
   }, [deviceId]);
+
+  // Check camera permission
+  const checkCameraPermission = async () => {
+    try {
+      // Request camera permission explicitly
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      // Stop the stream immediately, we just wanted to check permission
+      stream.getTracks().forEach(track => track.stop());
+      return true;
+    } catch (err: any) {
+      console.error("Camera permission error:", err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setScanError("Camera permission denied. Please allow camera access in your browser settings.");
+      } else if (err.name === 'NotFoundError') {
+        setScanError("No camera found on this device.");
+      } else {
+        setScanError("Unable to access camera. Please check your browser settings.");
+      }
+      return false;
+    }
+  };
+
+  // Start barcode/QR scanner
+  const startScanner = async () => {
+    try {
+      setScanError(null);
+      setIsScanning(true);
+
+      // Check camera permission first
+      const hasPermission = await checkCameraPermission();
+      if (!hasPermission) {
+        setIsScanning(false);
+        return;
+      }
+
+      const html5QrCode = new Html5Qrcode("qr-reader");
+      html5QrCodeRef.current = html5QrCode;
+
+      await html5QrCode.start(
+        { facingMode: "environment" }, // Use back camera
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+        },
+        (decodedText) => {
+          // Successfully scanned
+          setDeviceId(decodedText);
+          stopScanner();
+        },
+        (errorMessage) => {
+          // Scanning error (can be ignored, happens frequently)
+        }
+      );
+    } catch (err: any) {
+      console.error("Scanner error:", err);
+      setScanError(err?.message || "Failed to start camera. Please check permissions.");
+      setIsScanning(false);
+    }
+  };
+
+  // Stop barcode/QR scanner
+  const stopScanner = async () => {
+    try {
+      if (html5QrCodeRef.current) {
+        await html5QrCodeRef.current.stop();
+        html5QrCodeRef.current.clear();
+        html5QrCodeRef.current = null;
+      }
+    } catch (err) {
+      console.error("Error stopping scanner:", err);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  // Cleanup scanner on unmount or dialog close
+  useEffect(() => {
+    if (!open && isScanning) {
+      stopScanner();
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,6 +177,10 @@ const AddDeviceDialog = () => {
         setName('');
         setDeviceType('AIR');
         setCropType('');
+        setScanError(null);
+        if (isScanning) {
+          stopScanner();
+        }
       }
       setOpen(isOpen);
     }}>
@@ -110,35 +199,80 @@ const AddDeviceDialog = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="device-id">Device ID (QR Code or MAC Address)</Label>
-              <div className="relative">
-                <Input
-                  id="device-id"
-                  placeholder="Enter QR code or MAC address"
-                  value={deviceId}
-                  onChange={(e) => setDeviceId(e.target.value)}
-                  required
-                  className={
-                    validationResult?.checked
-                      ? validationResult.isValid
-                        ? 'border-green-500 focus-visible:ring-green-500'
-                        : 'border-red-500 focus-visible:ring-red-500'
-                      : ''
-                  }
-                />
-                {validateDeviceId.isPending && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              
+              {!isScanning ? (
+                <>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="device-id"
+                        placeholder="Enter QR code or MAC address"
+                        value={deviceId}
+                        onChange={(e) => setDeviceId(e.target.value)}
+                        required
+                        className={
+                          validationResult?.checked
+                            ? validationResult.isValid
+                              ? 'border-green-500 focus-visible:ring-green-500'
+                              : 'border-red-500 focus-visible:ring-red-500'
+                            : ''
+                        }
+                      />
+                      {validateDeviceId.isPending && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+                      {validationResult?.checked && validationResult.isValid && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={startScanner}
+                      title="Scan barcode or QR code"
+                    >
+                      <ScanLine className="h-4 w-4" />
+                    </Button>
                   </div>
-                )}
-                {validationResult?.checked && validationResult.isValid && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400 p-2 rounded-md">
+                    <ScanLine className="h-3 w-3" />
+                    <span>Click the scan button to open your camera and scan the device code.</span>
                   </div>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Enter the QR code or MAC address from your device. This will be validated against our device registry.
-              </p>
+                  <p className="text-xs text-muted-foreground">
+                    Enter or scan the QR code or MAC address from your device.
+                  </p>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <div id="qr-reader" className="rounded-lg overflow-hidden border-2 border-primary"></div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Position the barcode/QR code within the frame
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={stopScanner}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              {scanError && (
+                <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-500 p-2 rounded-md">
+                  <AlertTriangle className="h-3 w-3" />
+                  {scanError}
+                </div>
+              )}
               {deviceId && isDeviceIdTaken && (
                 <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-500 p-2 rounded-md">
                   <AlertTriangle className="h-3 w-3" />

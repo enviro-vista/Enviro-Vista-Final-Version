@@ -16,7 +16,9 @@ import {
   Copy,
   Star,
   Battery,
-  Zap
+  Zap,
+  Wind,
+  Sun
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Device } from "@/hooks/useDevices";
@@ -184,7 +186,7 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
           <div className="grid grid-cols-2 gap-4 mb-4">
             {device.device_type === 'SOIL' ? (
               <>
-                {/* Soil Device - Show soil_temperature, battery_percentage, humidity, battery_voltage */}
+                {/* Soil Device - Show soil_temperature, soil_moisture, battery_percentage, PAR */}
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded temp-gradient text-white">
                     <Thermometer className="h-3 w-3" />
@@ -192,6 +194,16 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
                   <div>
                     <p className="text-xs text-muted-foreground">Soil Temp</p>
                     <p className="font-semibold">{device.latest_reading.soil_temperature != null ? device.latest_reading.soil_temperature.toFixed(1) : '-' }°C</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded humidity-gradient text-white">
+                    <Droplets className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Soil Moisture</p>
+                    <p className="font-semibold">{device.latest_reading.soil_moisture_percentage != null ? device.latest_reading.soil_moisture_percentage.toFixed(1) : '-' }%</p>
                   </div>
                 </div>
 
@@ -206,35 +218,35 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded humidity-gradient text-white">
-                    <Droplets className="h-3 w-3" />
+                  <div className="p-1.5 rounded bg-gradient-to-br from-yellow-400 to-orange-500 text-white">
+                    <Sun className="h-3 w-3" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Humidity</p>
-                    <p className="font-semibold">{device.latest_reading.humidity != null ? device.latest_reading.humidity.toFixed(1) : '-' }%</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded bg-gradient-to-br from-yellow-500 to-orange-600 text-white">
-                    <Zap className="h-3 w-3" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Voltage</p>
-                    <p className="font-semibold">{device.latest_reading.battery_voltage != null ? device.latest_reading.battery_voltage.toFixed(2) : '-' }V</p>
+                    <p className="text-xs text-muted-foreground">PAR</p>
+                    <p className="font-semibold">{device.latest_reading.par != null ? device.latest_reading.par.toFixed(0) : '-' } µmol</p>
                   </div>
                 </div>
               </>
             ) : (
               <>
-                {/* Air Device - Keep original sensors */}
+                {/* Air Device - Show temperature, CO2, humidity, battery */}
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded temp-gradient text-white">
                     <Thermometer className="h-3 w-3" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Temp</p>
+                    <p className="text-xs text-muted-foreground">Air Temp</p>
                     <p className="font-semibold">{device.latest_reading.temperature != null ? device.latest_reading.temperature.toFixed(1) : '-' }°C</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded bg-gradient-to-br from-slate-500 to-slate-700 text-white">
+                    <Wind className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">CO₂</p>
+                    <p className="font-semibold">{device.latest_reading.co2 != null ? device.latest_reading.co2.toFixed(0) : '-' } ppm</p>
                   </div>
                 </div>
 
@@ -249,22 +261,12 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded pressure-gradient text-white">
-                    <Gauge className="h-3 w-3" />
+                  <div className="p-1.5 rounded bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+                    <Battery className="h-3 w-3" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Pressure</p>
-                    <p className="font-semibold">{device.latest_reading.pressure != null ? device.latest_reading.pressure.toFixed(0) : '-' } hPa</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded dewpoint-gradient text-white">
-                    <Cloud className="h-3 w-3" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Dew Point</p>
-                    <p className="font-semibold">{device.latest_reading.dew_point != null ? device.latest_reading.dew_point.toFixed(1) : '-' }°C</p>
+                    <p className="text-xs text-muted-foreground">Battery</p>
+                    <p className="font-semibold">{device.latest_reading.battery_percentage != null ? device.latest_reading.battery_percentage.toFixed(0) : '-' }%</p>
                   </div>
                 </div>
               </>
