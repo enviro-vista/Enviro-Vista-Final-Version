@@ -92,15 +92,20 @@ const AddDeviceDialog = () => {
       const html5QrCode = new Html5Qrcode("qr-reader");
       html5QrCodeRef.current = html5QrCode;
 
-      // Scanner config with improvements for better blurry code detection
+      // Scanner config with improvements for better quality and blurry code detection
       const scanConfig = {
         fps: 15, // Higher FPS = more chances to catch a clear frame
-        qrbox: { width: 280, height: 280 }, // Slightly larger scan area
-        aspectRatio: 1.0, // Square aspect ratio for QR codes
+        qrbox: { width: 250, height: 250 }, // Scanning area
         // Use native BarcodeDetector API when available (better for blurry codes)
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: true
         },
+        // Request higher resolution video for clearer, brighter image
+        videoConstraints: {
+          facingMode: "environment",
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 },
+        }
       } as Parameters<typeof html5QrCode.start>[1];
 
       await html5QrCode.start(
@@ -257,7 +262,11 @@ const AddDeviceDialog = () => {
                 </>
               ) : (
                 <div className="space-y-2">
-                  <div id="qr-reader" className="rounded-lg overflow-hidden border-2 border-primary"></div>
+                  <div 
+                    id="qr-reader" 
+                    className="rounded-lg overflow-hidden border-2 border-primary"
+                    style={{ minHeight: '300px' }}
+                  ></div>
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
                       Position the barcode/QR code within the frame

@@ -219,4 +219,25 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
   }
+
+  /* QR Scanner - ensure high quality video display */
+  #qr-reader {
+    background: #000;
+  }
+  
+  #qr-reader video {
+    width: 100% !important;
+    height: auto !important;
+    object-fit: cover;
+    /* Prevent browser from reducing video quality */
+    image-rendering: -webkit-optimize-contrast;
+  }
+  
+  #qr-reader__scan_region {
+    background: transparent !important;
+  }
+  
+  #qr-reader__dashboard {
+    padding: 8px !important;
+  }
 }
