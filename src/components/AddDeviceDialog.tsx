@@ -92,12 +92,20 @@ const AddDeviceDialog = () => {
       const html5QrCode = new Html5Qrcode("qr-reader");
       html5QrCodeRef.current = html5QrCode;
 
+      // Scanner config with improvements for better blurry code detection
+      const scanConfig = {
+        fps: 15, // Higher FPS = more chances to catch a clear frame
+        qrbox: { width: 280, height: 280 }, // Slightly larger scan area
+        aspectRatio: 1.0, // Square aspect ratio for QR codes
+        // Use native BarcodeDetector API when available (better for blurry codes)
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        },
+      } as Parameters<typeof html5QrCode.start>[1];
+
       await html5QrCode.start(
         { facingMode: "environment" }, // Use back camera
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        },
+        scanConfig,
         (decodedText) => {
           // Successfully scanned
           setDeviceId(decodedText);
