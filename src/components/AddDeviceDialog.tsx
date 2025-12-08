@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Loader2, AlertTriangle, CheckCircle2, ScanLine, X } from 'lucide-react';
 import { useAddDevice, useDevices, useValidateDeviceId } from '@/hooks/useDevices';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Scanner } from '@yudiel/react-qr-scanner';
 
 const AddDeviceDialog = () => {
   const [open, setOpen] = useState(false);
@@ -22,7 +22,6 @@ const AddDeviceDialog = () => {
   const addDevice = useAddDevice();
   const validateDeviceId = useValidateDeviceId();
   const { data: existingDevices } = useDevices();
-  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   
   // Check if device MAC address is already taken (compare with MAC address from validation)
   const isDeviceIdTaken = validationResult?.macAddress 
@@ -55,99 +54,29 @@ const AddDeviceDialog = () => {
     return () => clearTimeout(timer);
   }, [deviceId]);
 
-  // Check camera permission
-  const checkCameraPermission = async () => {
-    try {
-      // Request camera permission explicitly
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      // Stop the stream immediately, we just wanted to check permission
-      stream.getTracks().forEach(track => track.stop());
-      return true;
-    } catch (err: any) {
-      console.error("Camera permission error:", err);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setScanError("Camera permission denied. Please allow camera access in your browser settings.");
-      } else if (err.name === 'NotFoundError') {
+  // Handle successful scan
+  const handleScan = (result: { rawValue: string }[]) => {
+    if (result && result.length > 0) {
+      const scannedValue = result[0].rawValue;
+      setDeviceId(scannedValue);
+      setIsScanning(false);
+      setScanError(null);
+    }
+  };
+
+  // Handle scan error
+  const handleScanError = (error: unknown) => {
+    console.error("Scanner error:", error);
+    if (error instanceof Error) {
+      if (error.name === 'NotAllowedError') {
+        setScanError("Camera permission denied. Please allow camera access.");
+      } else if (error.name === 'NotFoundError') {
         setScanError("No camera found on this device.");
       } else {
-        setScanError("Unable to access camera. Please check your browser settings.");
+        setScanError(error.message || "Scanner error occurred.");
       }
-      return false;
     }
   };
-
-  // Start barcode/QR scanner
-  const startScanner = async () => {
-    try {
-      setScanError(null);
-      setIsScanning(true);
-
-      // Check camera permission first
-      const hasPermission = await checkCameraPermission();
-      if (!hasPermission) {
-        setIsScanning(false);
-        return;
-      }
-
-      const html5QrCode = new Html5Qrcode("qr-reader");
-      html5QrCodeRef.current = html5QrCode;
-
-      // Scanner config with improvements for better quality and blurry code detection
-      const scanConfig = {
-        fps: 15, // Higher FPS = more chances to catch a clear frame
-        qrbox: { width: 250, height: 250 }, // Scanning area
-        // Use native BarcodeDetector API when available (better for blurry codes)
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true
-        },
-        // Request higher resolution video for clearer, brighter image
-        videoConstraints: {
-          facingMode: "environment",
-          width: { min: 640, ideal: 1280, max: 1920 },
-          height: { min: 480, ideal: 720, max: 1080 },
-        }
-      } as Parameters<typeof html5QrCode.start>[1];
-
-      await html5QrCode.start(
-        { facingMode: "environment" }, // Use back camera
-        scanConfig,
-        (decodedText) => {
-          // Successfully scanned
-          setDeviceId(decodedText);
-          stopScanner();
-        },
-        (errorMessage) => {
-          // Scanning error (can be ignored, happens frequently)
-        }
-      );
-    } catch (err: any) {
-      console.error("Scanner error:", err);
-      setScanError(err?.message || "Failed to start camera. Please check permissions.");
-      setIsScanning(false);
-    }
-  };
-
-  // Stop barcode/QR scanner
-  const stopScanner = async () => {
-    try {
-      if (html5QrCodeRef.current) {
-        await html5QrCodeRef.current.stop();
-        html5QrCodeRef.current.clear();
-        html5QrCodeRef.current = null;
-      }
-    } catch (err) {
-      console.error("Error stopping scanner:", err);
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
-  // Cleanup scanner on unmount or dialog close
-  useEffect(() => {
-    if (!open && isScanning) {
-      stopScanner();
-    }
-  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,9 +120,7 @@ const AddDeviceDialog = () => {
         setDeviceType('AIR');
         setCropType('');
         setScanError(null);
-        if (isScanning) {
-          stopScanner();
-        }
+        setIsScanning(false);
       }
       setOpen(isOpen);
     }}>
@@ -246,7 +173,10 @@ const AddDeviceDialog = () => {
                       type="button"
                       variant="outline"
                       size="icon"
-                      onClick={startScanner}
+                      onClick={() => {
+                        setScanError(null);
+                        setIsScanning(true);
+                      }}
                       title="Scan barcode or QR code"
                     >
                       <ScanLine className="h-4 w-4" />
@@ -262,11 +192,30 @@ const AddDeviceDialog = () => {
                 </>
               ) : (
                 <div className="space-y-2">
-                  <div 
-                    id="qr-reader" 
-                    className="rounded-lg overflow-hidden border-2 border-primary"
-                    style={{ minHeight: '300px' }}
-                  ></div>
+                  <div className="rounded-lg overflow-hidden border-2 border-primary" style={{ minHeight: '300px' }}>
+                    <Scanner
+                      onScan={handleScan}
+                      onError={handleScanError}
+                      constraints={{
+                        facingMode: 'environment',
+                      }}
+                      styles={{
+                        container: {
+                          width: '100%',
+                          height: '300px',
+                        },
+                        video: {
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        },
+                      }}
+                      components={{
+                        torch: true, // Enable flashlight toggle if available
+                        finder: true, // Show the scanning area indicator
+                      }}
+                    />
+                  </div>
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
                       Position the barcode/QR code within the frame
@@ -275,7 +224,7 @@ const AddDeviceDialog = () => {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={stopScanner}
+                      onClick={() => setIsScanning(false)}
                     >
                       <X className="h-4 w-4 mr-1" />
                       Cancel
