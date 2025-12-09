@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Loader2, AlertTriangle, CheckCircle2, ScanLine, X } from 'lucide-react';
 import { useAddDevice, useDevices, useValidateDeviceId } from '@/hooks/useDevices';
 import { Scanner } from '@yudiel/react-qr-scanner';
+
+// Pattern to validate scanned values - accepts MAC addresses and alphanumeric codes
+// MAC formats: XX:XX:XX:XX:XX:XX, XX-XX-XX-XX-XX-XX, XXXXXXXXXXXX
+// Also accepts alphanumeric codes (6-32 characters)
+const isValidDeviceIdPattern = (value: string): boolean => {
+  const trimmed = value.trim();
+  
+  // MAC address with colons: AA:BB:CC:DD:EE:FF
+  const macWithColons = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
+  // MAC address with dashes: AA-BB-CC-DD-EE-FF
+  const macWithDashes = /^([0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}$/;
+  // MAC address without separators: AABBCCDDEEFF
+  const macNoSeparator = /^[0-9A-Fa-f]{12}$/;
+  // General alphanumeric code (6-32 chars, allows underscores and dashes)
+  const alphanumericCode = /^[A-Za-z0-9_-]{6,32}$/;
+  
+  return (
+    macWithColons.test(trimmed) ||
+    macWithDashes.test(trimmed) ||
+    macNoSeparator.test(trimmed) ||
+    alphanumericCode.test(trimmed)
+  );
+};
 
 const AddDeviceDialog = () => {
   const [open, setOpen] = useState(false);
@@ -18,6 +41,12 @@ const AddDeviceDialog = () => {
   const [validationResult, setValidationResult] = useState<{ isValid: boolean; checked: boolean; isUsed?: boolean; macAddress?: string | null } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [pendingScan, setPendingScan] = useState<string | null>(null);
+  const [scanConfirmCount, setScanConfirmCount] = useState(0);
+  const lastScanRef = useRef<string | null>(null);
+  
+  // Number of consistent scans required before accepting
+  const REQUIRED_SCAN_COUNT = 3;
   
   const addDevice = useAddDevice();
   const validateDeviceId = useValidateDeviceId();
@@ -54,13 +83,47 @@ const AddDeviceDialog = () => {
     return () => clearTimeout(timer);
   }, [deviceId]);
 
-  // Handle successful scan
+  // Reset scan confirmation when scanning starts
+  useEffect(() => {
+    if (isScanning) {
+      setPendingScan(null);
+      setScanConfirmCount(0);
+      lastScanRef.current = null;
+    }
+  }, [isScanning]);
+
+  // Handle successful scan with confirmation
   const handleScan = (result: { rawValue: string }[]) => {
     if (result && result.length > 0) {
-      const scannedValue = result[0].rawValue;
-      setDeviceId(scannedValue);
-      setIsScanning(false);
-      setScanError(null);
+      const scannedValue = result[0].rawValue.trim();
+      
+      // Filter out invalid patterns (noise from transistors, etc.)
+      if (!isValidDeviceIdPattern(scannedValue)) {
+        // Ignore this scan - it's likely noise
+        return;
+      }
+      
+      // Check if this is the same code we've been seeing
+      if (scannedValue === lastScanRef.current) {
+        // Same code - increment confirmation count
+        const newCount = scanConfirmCount + 1;
+        setScanConfirmCount(newCount);
+        setPendingScan(scannedValue);
+        
+        // If we've confirmed enough times, accept the scan
+        if (newCount >= REQUIRED_SCAN_COUNT) {
+          setDeviceId(scannedValue);
+          setIsScanning(false);
+          setScanError(null);
+          setPendingScan(null);
+          setScanConfirmCount(0);
+        }
+      } else {
+        // Different code - reset and start counting this one
+        lastScanRef.current = scannedValue;
+        setScanConfirmCount(1);
+        setPendingScan(scannedValue);
+      }
     }
   };
 
@@ -121,6 +184,8 @@ const AddDeviceDialog = () => {
         setCropType('');
         setScanError(null);
         setIsScanning(false);
+        setPendingScan(null);
+        setScanConfirmCount(0);
       }
       setOpen(isOpen);
     }}>
@@ -199,6 +264,7 @@ const AddDeviceDialog = () => {
                       constraints={{
                         facingMode: 'environment',
                       }}
+                      formats={['qr_code', 'data_matrix']} // Only scan QR codes and data matrix, ignore barcodes
                       styles={{
                         container: {
                           width: '100%',
@@ -216,9 +282,31 @@ const AddDeviceDialog = () => {
                       }}
                     />
                   </div>
+                  {/* Scan confirmation progress */}
+                  {pendingScan && scanConfirmCount > 0 && (
+                    <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-950/30 p-2 rounded-md">
+                      <div className="flex-1">
+                        <p className="text-blue-700 dark:text-blue-400 font-medium truncate">
+                          Detected: {pendingScan}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex-1 h-1.5 bg-blue-200 dark:bg-blue-900 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-blue-600 transition-all duration-200"
+                              style={{ width: `${(scanConfirmCount / REQUIRED_SCAN_COUNT) * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-blue-600 dark:text-blue-400 text-[10px]">
+                            {scanConfirmCount}/{REQUIRED_SCAN_COUNT}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
-                      Position the barcode/QR code within the frame
+                      Hold steady on the QR code until confirmed
                     </p>
                     <Button
                       type="button"
