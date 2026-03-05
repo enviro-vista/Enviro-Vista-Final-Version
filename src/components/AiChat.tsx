@@ -382,7 +382,7 @@ export default function AiChat({ className, compact = false }: AiChatProps) {
   }
 
   return (
-    <Card className={cn("glass-card", className)}>
+    <Card className={cn("glass-card", className)} data-onboarding="ai-chat">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">

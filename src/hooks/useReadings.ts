@@ -38,13 +38,22 @@ export interface DateRange {
   to: Date | undefined;
 }
 
+// Stable key for custom date range (avoid refetch loops from new object refs)
+function dateRangeKey(range?: DateRange): string | undefined {
+  if (!range?.from || !range?.to || !(range.from instanceof Date) || !(range.to instanceof Date)) return undefined;
+  return `${range.from.toISOString()}|${range.to.toISOString()}`;
+}
+
 export const useReadings = (
   deviceId?: string, 
   timeRange: string = '24h',
   customDateRange?: DateRange
 ) => {
+  const rangeKey = dateRangeKey(customDateRange);
+  const useCustomRange = Boolean(rangeKey);
+
   return useQuery({
-    queryKey: ['readings', deviceId, timeRange, customDateRange],
+    queryKey: ['readings', deviceId, timeRange, rangeKey ?? null],
     queryFn: async () => {
       // Get the current user's session for authentication
       const { data: { session } } = await supabase.auth.getSession();
@@ -61,8 +70,8 @@ export const useReadings = (
       params.append('time_range', timeRange);
       params.append('limit', '1000');
 
-      // Add custom date range if provided
-      if (customDateRange?.from && customDateRange?.to) {
+      // Add custom date range only when both from and to are valid dates
+      if (useCustomRange && customDateRange?.from && customDateRange?.to) {
         params.append('start_date', customDateRange.from.toISOString());
         params.append('end_date', customDateRange.to.toISOString());
       }
@@ -80,12 +89,14 @@ export const useReadings = (
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to fetch readings');
       }
 
-      const result = await response.json();
-      return result.data as Reading[];
+      const result = await response.json().catch(() => ({}));
+      const raw = result?.data ?? result?.readings ?? result;
+      const list = Array.isArray(raw) ? raw : [];
+      return list as Reading[];
     },
     staleTime: 30 * 1000, // Consider data fresh for 30 seconds
     refetchOnWindowFocus: false, // Don't refetch when window regains focus

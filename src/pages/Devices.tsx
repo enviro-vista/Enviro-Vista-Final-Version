@@ -116,10 +116,10 @@ const Devices = () => {
                 <Grid3X3 className="h-3 w-3 mr-1" />
                 Grid
               </TabsTrigger>
-              {/* <TabsTrigger value="chart" className="text-xs px-3">
+              <TabsTrigger value="chart" className="text-xs px-3">
                 <BarChart3 className="h-3 w-3 mr-1" />
                 Charts
-              </TabsTrigger> */}
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>

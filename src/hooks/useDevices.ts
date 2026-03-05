@@ -216,18 +216,30 @@ export const useDeleteDevice = () => {
   });
 };
 
-// Validate device ID against available_devices table
+// Normalize and quote value for PostgREST .or() filter (handles spaces, special chars)
+function quotedOrValue(value: string): string {
+  const trimmed = value.trim();
+  const escaped = trimmed.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+// Validate device ID against available_devices table (by qr_code, mac_address, or device_name)
 export const useValidateDeviceId = () => {
   return useMutation({
     mutationFn: async (deviceId: string) => {
+      const normalized = deviceId.trim();
+      if (!normalized) {
+        return { isValid: false, isUsed: false, macAddress: null, device: null };
+      }
+      const q = quotedOrValue(normalized);
       const { data, error } = await supabase
         .from('available_devices')
         .select('qr_code, mac_address, is_used')
-        .or(`qr_code.eq.${deviceId},mac_address.eq.${deviceId}`)
+        .or(`qr_code.eq.${q},mac_address.eq.${q},device_name.eq.${q}`)
         .maybeSingle();
 
       if (error) throw error;
-      
+
       // Device is valid only if it exists AND has not been used
       return {
         isValid: !!data && !data.is_used,
@@ -252,11 +264,13 @@ export const useAddDevice = () => {
         throw authError || new Error('User not authenticated');
       }
 
-      // Validate device ID against available_devices table
+      // Validate device ID against available_devices table (by qr_code, mac_address, or device_name)
+      const normalizedId = device_id.trim();
+      const q = quotedOrValue(normalizedId);
       const { data: availableDevice, error: validationError } = await supabase
         .from('available_devices')
         .select('id, qr_code, mac_address, is_used')
-        .or(`qr_code.eq.${device_id},mac_address.eq.${device_id}`)
+        .or(`qr_code.eq.${q},mac_address.eq.${q},device_name.eq.${q}`)
         .maybeSingle();
 
       if (validationError) {
@@ -271,12 +285,13 @@ export const useAddDevice = () => {
         throw new Error('This device has already been registered. Please contact support if you believe this is an error.');
       }
 
-      // Prepare insert data - use MAC address as device_id
+      // Prepare insert data - use MAC address as device_id and link to available_devices
       const insertData: any = { 
         device_id: availableDevice.mac_address, 
         name, 
         device_type, 
-        owner_id: user.id 
+        owner_id: user.id,
+        available_device_id: availableDevice.id,
       };
       if (crop_type) {
         insertData.crop_type = crop_type;

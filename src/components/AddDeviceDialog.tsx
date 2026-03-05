@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Loader2, AlertTriangle, CheckCircle2, ScanLine, X } from 'lucide-react';
 import { useAddDevice, useDevices, useValidateDeviceId } from '@/hooks/useDevices';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { Scanner } from '@yudiel/react-qr-scanner';
 
 // Pattern to validate scanned values - accepts MAC addresses and alphanumeric codes
@@ -51,6 +52,7 @@ const AddDeviceDialog = () => {
   const addDevice = useAddDevice();
   const validateDeviceId = useValidateDeviceId();
   const { data: existingDevices } = useDevices();
+  const { completeChecklistItem } = useOnboarding();
   
   // Check if device MAC address is already taken (compare with MAC address from validation)
   const isDeviceIdTaken = validationResult?.macAddress 
@@ -162,6 +164,8 @@ const AddDeviceDialog = () => {
         crop_type: cropType.trim() || null
       });
       setDeviceToken(res.token);
+      // Mark checklist item as complete
+      completeChecklistItem('add-device');
       setDeviceId('');
       setName('');
       setDeviceType('AIR');
@@ -190,7 +194,7 @@ const AddDeviceDialog = () => {
       setOpen(isOpen);
     }}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" data-onboarding="add-device">
           <Plus className="h-4 w-4 mr-2" />
           Add Device
         </Button>
@@ -263,7 +267,9 @@ const AddDeviceDialog = () => {
                       onError={handleScanError}
                       constraints={{
                         facingMode: 'environment',
-                      }}
+                        // Start with zoom when supported (zoom is in MediaTrackConstraintSet but not in TS DOM lib)
+                        zoom: { ideal: 1.5 },
+                      } as MediaTrackConstraints}
                       formats={['qr_code', 'data_matrix']} // Only scan QR codes and data matrix, ignore barcodes
                       styles={{
                         container: {
@@ -279,6 +285,7 @@ const AddDeviceDialog = () => {
                       components={{
                         torch: true, // Enable flashlight toggle if available
                         finder: true, // Show the scanning area indicator
+                        zoom: true, // Enable zoom controls when supported (e.g. Android)
                       }}
                     />
                   </div>

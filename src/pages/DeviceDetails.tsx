@@ -1,11 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useParams } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DateRangeFilter, DateRange } from '@/components/DateRangeFilter';
 import { useSubscriptionStatus } from '@/hooks/useSubscription';
 import { useReadings } from '@/hooks/useReadings';
 import { useAllDevices } from '@/hooks/useDevices';
+import { exportToCSV, exportToJSON, downloadFile, generateFilename } from '@/utils/dataExport';
+import { Download, FileText, BarChart3, Table2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+
+const ChartView = lazy(() => import('@/components/ChartView'));
 
 const DeviceDetails = () => {
   const { id } = useParams();
@@ -16,6 +23,7 @@ const DeviceDetails = () => {
   // Date range state
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
   const [timePreset, setTimePreset] = useState('24h');
+  const [activeView, setActiveView] = useState<'table' | 'chart'>('table');
   
   const { data: readings = [], isLoading, error, isFetching } = useReadings(
     id, 
@@ -38,16 +46,62 @@ const DeviceDetails = () => {
     return { temperature: t, humidity: h, pressure: p, dewPoint: d };
   }, [readings]);
 
-  // Debug logging
-  console.log('DeviceDetails Debug:', {
-    deviceId: id,
-    timePreset,
-    dateRange,
-    readingsCount: readings.length,
-    isLoading,
-    isFetching,
-    error: error?.message
-  });
+  // Export handlers
+  const handleExportCSV = () => {
+    if (readings.length === 0) {
+      toast({
+        title: "No Data",
+        description: "There are no readings to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const csvContent = exportToCSV(readings, device?.name);
+      const filename = generateFilename(device?.name || 'device', 'csv', dateRange);
+      downloadFile(csvContent, filename, 'text/csv');
+      toast({
+        title: "Export Successful",
+        description: `Exported ${readings.length} readings to CSV.`,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportJSON = () => {
+    if (readings.length === 0) {
+      toast({
+        title: "No Data",
+        description: "There are no readings to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const jsonContent = exportToJSON(readings, device?.name);
+      const filename = generateFilename(device?.name || 'device', 'json', dateRange);
+      downloadFile(jsonContent, filename, 'application/json');
+      toast({
+        title: "Export Successful",
+        description: `Exported ${readings.length} readings to JSON.`,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Only show full loading screen on initial load, not on refetches
   if (isLoading && !readings.length) {
@@ -103,21 +157,46 @@ const DeviceDetails = () => {
           )}
         </div>
 
-        {/* Debug Info */}
-        <Card className="p-4 bg-muted/50">
-          <div className="text-sm space-y-1">
-            <p><strong>Device ID:</strong> {id}</p>
-            <p><strong>Time Preset:</strong> {timePreset}</p>
-            <p><strong>Custom Range:</strong> {timePreset === 'custom' ? 'Yes' : 'No'}</p>
-            {timePreset === 'custom' && dateRange.from && dateRange.to && (
-              <>
-                <p><strong>From:</strong> {dateRange.from.toISOString()}</p>
-                <p><strong>To:</strong> {dateRange.to.toISOString()}</p>
-              </>
-            )}
-            <p><strong>Readings Count:</strong> {readings.length}</p>
+        {/* Action Bar - Export and View Toggle */}
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'table' | 'chart')}>
+              <TabsList>
+                <TabsTrigger value="table">
+                  <Table2 className="h-4 w-4 mr-2" />
+                  Table
+                </TabsTrigger>
+                <TabsTrigger value="chart">
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Charts
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-        </Card>
+          
+          {readings.length > 0 && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportCSV}
+                disabled={readings.length === 0}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportJSON}
+                disabled={readings.length === 0}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Export JSON
+              </Button>
+            </div>
+          )}
+        </div>
 
         {/* Averages */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -155,87 +234,107 @@ const DeviceDetails = () => {
           </Card>
         </div>
 
-        {/* Readings Table */}
-        <div className={`bg-card rounded-lg border transition-opacity duration-200 ${isFetching ? 'opacity-75' : 'opacity-100'}`}>
-          <div className="p-4 border-b">
-            <h3 className="font-semibold">Readings</h3>
-          </div>
-          
-          {isFetching && !readings.length ? (
-            <div className="p-8">
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex space-x-4">
-                    <div className="h-4 bg-muted animate-pulse rounded flex-1"></div>
-                    <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
-                    <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
-                    <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
-                    <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
-                    {isPremium && (
-                      <>
-                        <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
-                        <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
-                        <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
-                        <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
+        {/* Readings Table or Charts */}
+        {activeView === 'table' ? (
+          <div className={`bg-card rounded-lg border transition-opacity duration-200 ${isFetching ? 'opacity-75' : 'opacity-100'}`}>
+            <div className="p-4 border-b">
+              <h3 className="font-semibold">Readings</h3>
             </div>
-          ) : readings.length === 0 ? (
-            <div className="p-8 text-center">
-              <h3 className="text-lg font-semibold mb-2">No Data Available</h3>
-              <p className="text-muted-foreground mb-4">
-                No readings found for the selected time range.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Try selecting a different time range or check if the device is sending data.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left">
-                    <th className="px-4 py-2">Timestamp</th>
-                    <th className="px-4 py-2">Temp (°C)</th>
-                    <th className="px-4 py-2">Humidity (%)</th>
-                    <th className="px-4 py-2">Pressure (hPa)</th>
-                    <th className="px-4 py-2">Dew Point (°C)</th>
-                    {isPremium && (
-                      <>
-                        <th className="px-4 py-2">CO₂ (ppm)</th>
-                        <th className="px-4 py-2">Light (lux)</th>
-                        <th className="px-4 py-2">Soil Moist (%)</th>
-                        <th className="px-4 py-2">Battery (%)</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {readings.map(r => (
-                    <tr key={r.id} className="border-t">
-                      <td className="px-4 py-2 whitespace-nowrap">{new Date(r.timestamp).toLocaleString()}</td>
-                      <td className="px-4 py-2">{r.temperature?.toFixed(1) ?? '-'}</td>
-                      <td className="px-4 py-2">{r.humidity?.toFixed(1) ?? '-'}</td>
-                      <td className="px-4 py-2">{r.pressure?.toFixed(0) ?? '-'}</td>
-                      <td className="px-4 py-2">{r.dew_point?.toFixed(1) ?? '-'}</td>
+            
+            {isFetching && !readings.length ? (
+              <div className="p-8">
+                <div className="space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex space-x-4">
+                      <div className="h-4 bg-muted animate-pulse rounded flex-1"></div>
+                      <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                      <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                      <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                      <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
                       {isPremium && (
                         <>
-                          <td className="px-4 py-2">{r.co2 ?? '-'}</td>
-                          <td className="px-4 py-2">{r.light_veml7700 ?? r.light_tsl2591 ?? '-'}</td>
-                          <td className="px-4 py-2">{r.soil_moisture_percentage?.toFixed(1) ?? '-'}</td>
-                          <td className="px-4 py-2">{r.battery_percentage?.toFixed(0) ?? '-'}</td>
+                          <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                          <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                          <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                          <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : readings.length === 0 ? (
+              <div className="p-8 text-center">
+                <h3 className="text-lg font-semibold mb-2">No Data Available</h3>
+                <p className="text-muted-foreground mb-4">
+                  No readings found for the selected time range.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Try selecting a different time range or check if the device is sending data.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="px-4 py-2">Timestamp</th>
+                      <th className="px-4 py-2">Temp (°C)</th>
+                      <th className="px-4 py-2">Humidity (%)</th>
+                      <th className="px-4 py-2">Pressure (hPa)</th>
+                      <th className="px-4 py-2">Dew Point (°C)</th>
+                      {isPremium && (
+                        <>
+                          <th className="px-4 py-2">CO₂ (ppm)</th>
+                          <th className="px-4 py-2">Light (lux)</th>
+                          <th className="px-4 py-2">Soil Moist (%)</th>
+                          <th className="px-4 py-2">Battery (%)</th>
                         </>
                       )}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                  </thead>
+                  <tbody>
+                    {readings.map(r => (
+                      <tr key={r.id} className="border-t">
+                        <td className="px-4 py-2 whitespace-nowrap">{new Date(r.timestamp).toLocaleString()}</td>
+                        <td className="px-4 py-2">{r.temperature?.toFixed(1) ?? '-'}</td>
+                        <td className="px-4 py-2">{r.humidity?.toFixed(1) ?? '-'}</td>
+                        <td className="px-4 py-2">{r.pressure?.toFixed(0) ?? '-'}</td>
+                        <td className="px-4 py-2">{r.dew_point?.toFixed(1) ?? '-'}</td>
+                        {isPremium && (
+                          <>
+                            <td className="px-4 py-2">{r.co2 ?? '-'}</td>
+                            <td className="px-4 py-2">{r.light_veml7700 ?? r.light_tsl2591 ?? '-'}</td>
+                            <td className="px-4 py-2">{r.soil_moisture_percentage?.toFixed(1) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.battery_percentage?.toFixed(0) ?? '-'}</td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading charts...</p>
+                </div>
+              </div>
+            }>
+              <ChartView 
+                devices={device ? [device] : []} 
+                selectedDevice={id || 'all'}
+                timeRange={timePreset === 'custom' ? '24h' : timePreset}
+                customDateRange={timePreset === 'custom' ? dateRange : undefined}
+              />
+            </Suspense>
+          </div>
+        )}
       </div>
     </AppLayout>
   );

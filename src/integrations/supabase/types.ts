@@ -17,6 +17,7 @@ export type Database = {
       available_devices: {
         Row: {
           id: string
+          device_name: string | null
           qr_code: string
           mac_address: string
           is_used: boolean
@@ -25,6 +26,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          device_name?: string | null
           qr_code: string
           mac_address: string
           is_used?: boolean
@@ -33,6 +35,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          device_name?: string | null
           qr_code?: string
           mac_address?: string
           is_used?: boolean
@@ -50,6 +53,7 @@ export type Database = {
           name: string
           owner_id: string
           updated_at: string | null
+          available_device_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -59,6 +63,7 @@ export type Database = {
           name: string
           owner_id: string
           updated_at?: string | null
+          available_device_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -68,6 +73,7 @@ export type Database = {
           name?: string
           owner_id?: string
           updated_at?: string | null
+          available_device_id?: string | null
         }
         Relationships: [
           {
@@ -75,6 +81,13 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devices_available_device_id_fkey"
+            columns: ["available_device_id"]
+            isOneToOne: true
+            referencedRelation: "available_devices"
             referencedColumns: ["id"]
           },
         ]
@@ -498,6 +511,27 @@ export type Database = {
       }
       is_admin: {
         Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      admin_insert_available_device: {
+        Args: {
+          p_device_name: string
+          p_qr_code: string
+          p_mac_address: string
+        }
+        Returns: Database["public"]["Tables"]["available_devices"]["Row"]
+      }
+      admin_update_available_device: {
+        Args: {
+          p_id: string
+          p_device_name?: string | null
+          p_qr_code?: string | null
+          p_mac_address?: string | null
+        }
+        Returns: Database["public"]["Tables"]["available_devices"]["Row"]
+      }
+      admin_delete_available_device: {
+        Args: { p_id: string }
         Returns: boolean
       }
       is_premium: {

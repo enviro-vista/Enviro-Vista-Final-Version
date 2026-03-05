@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,9 +66,14 @@ interface DeletedUser {
   created_at: string;
 }
 
+const ADMIN_TAB_VALUES = ['users', 'deleted', 'devices', 'transactions', 'admin'] as const;
+
 const Admin = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const activeTab = ADMIN_TAB_VALUES.includes(tabParam as any) ? tabParam : 'users';
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [devices, setDevices] = useState<AdminDevice[]>([]);
   const [deletedUsers, setDeletedUsers] = useState<DeletedUser[]>([]);
@@ -583,7 +589,11 @@ const Admin = () => {
         </Card>
       </div>
 
-      <Tabs defaultValue="users" className="w-full">
+      <Tabs
+        value={activeTab ?? 'users'}
+        onValueChange={(v) => setSearchParams({ tab: v })}
+        className="w-full"
+      >
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="deleted">Deleted Users</TabsTrigger>

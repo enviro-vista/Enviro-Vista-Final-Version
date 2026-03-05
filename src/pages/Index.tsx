@@ -20,9 +20,11 @@ import {
 import SubscriptionStatusBadge from "@/components/SubscriptionStatusBadge";
 import { AppLayout } from "@/components/AppLayout";
 import UpgradePrompt from "@/components/UpgradePrompt";
+import QuickStartChecklist from "@/components/QuickStartChecklist";
 import { useDevices, useAllDevices } from "@/hooks/useDevices";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscriptionStatus, useCheckSubscription } from "@/hooks/useSubscription";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import {
@@ -53,6 +55,8 @@ const Index = () => {
   const { signOut } = useAuth();
   const { isPremium, isFree } = useSubscriptionStatus();
   const checkSubscription = useCheckSubscription();
+  const { isFirstTimeUser, hasCompletedOnboarding } = useOnboarding();
+  const [showChecklist, setShowChecklist] = useState(true);
   
   // Initialize state safely for SSR/SSG
   const [liveMonitoring, setLiveMonitoring] = useState(true);
@@ -255,6 +259,13 @@ const Index = () => {
     >
       <div className="space-y-4">
         
+        {/* Quick Start Checklist for First-Time Users */}
+        {isFirstTimeUser && !hasCompletedOnboarding && showChecklist && (
+          <div data-onboarding="quick-start-checklist">
+            <QuickStartChecklist onDismiss={() => setShowChecklist(false)} />
+          </div>
+        )}
+        
         {/* Upgrade Prompt for Free Users */}
         {isFree && showUpgradePrompt && (
           <div className="animate-slide-up">
@@ -266,6 +277,8 @@ const Index = () => {
           </div>
         )}
         
+        {/* Dashboard overview section: metrics + status (tour target) */}
+        <section className="space-y-4" data-onboarding="dashboard-overview">
         {/* Overview Cards - 8 cards with relevant readings */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {/* Temperature Card */}
@@ -446,6 +459,7 @@ const Index = () => {
             </div>
           </div>
         </Card>
+        </section>
 
         {/* View Toggle - Adjusted for mobile */}
         <div className="flex items-center justify-between">
@@ -456,10 +470,10 @@ const Index = () => {
                 <Grid3X3 className="h-3 w-3 mr-1" />
                 Grid
               </TabsTrigger>
-              {/* <TabsTrigger value="chart" className="text-xs px-3">
+              <TabsTrigger value="chart" className="text-xs px-3">
                 <BarChart3 className="h-3 w-3 mr-1" />
                 Charts
-              </TabsTrigger> */}
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -487,7 +501,7 @@ const Index = () => {
                 )}
                 
                 {/* Show devices (limited to 2 from API) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-onboarding="devices-grid">
                   {devices.length > 0 ? (
                     devices.map((device) => (
                       <Suspense key={device.id} fallback={<div className="bg-muted rounded-lg h-40 animate-pulse"></div>}>

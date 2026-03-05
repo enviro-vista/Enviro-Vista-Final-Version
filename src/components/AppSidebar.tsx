@@ -18,10 +18,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscriptionStatus } from '@/hooks/useSubscription';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useFavoriteDevices } from '@/hooks/useDevices';
+import { HelpCircle } from 'lucide-react';
 import {
   Home,
   CreditCard,
@@ -36,6 +38,7 @@ import {
   Users,
   Database,
   DollarSign,
+  Cpu,
 } from 'lucide-react';
 
 interface AppSidebarProps {
@@ -45,6 +48,7 @@ interface AppSidebarProps {
 export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
   const { user, signOut } = useAuth();
   const { isPremium } = useSubscriptionStatus();
+  const { startSidebarTour } = useOnboarding();
   const [isAdmin, setIsAdmin] = useState(false);
   const location = useLocation();
   const { setOpenMobile, isMobile } = useSidebar();
@@ -79,7 +83,12 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
     }
   };
 
-  const isCurrentPage = (path: string) => location.pathname === path;
+  const isCurrentPage = (path: string) => {
+    const full = location.pathname + (location.search || '');
+    if (full === path) return true;
+    if (path === location.pathname && !location.search) return true;
+    return false;
+  };
 
   // Main navigation items
   const mainNavigation = [
@@ -133,6 +142,12 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
       icon: Shield,
       description: 'Administrative controls'
     },
+    {
+      name: 'Manage Devices',
+      href: '/admin/devices',
+      icon: Cpu,
+      description: 'Available device registry (QR codes and MAC addresses)'
+    },
     // {
     //   name: 'User Management',
     //   href: '/admin/users',
@@ -154,7 +169,7 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
   ];
 
   return (
-    <Sidebar variant={variant} className="border-r">
+    <Sidebar variant={variant} className="border-r" data-onboarding="sidebar">
       {/* Header */}
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-2">
@@ -190,7 +205,18 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
 
         {/* Main Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
+          <div className="flex items-center justify-between px-2 mb-2">
+            <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              onClick={startSidebarTour}
+              title="Take a tour of navigation"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          </div>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainNavigation.map((item) => (
@@ -199,6 +225,7 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
                     asChild
                     isActive={isCurrentPage(item.href)}
                     tooltip={item.description}
+                    data-onboarding={`sidebar-${item.name.toLowerCase()}`}
                   >
                     <Link to={item.href} onClick={handleNavigate}>
                       <item.icon className="h-5 w-5" />
@@ -252,6 +279,7 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
                     asChild
                     isActive={isCurrentPage(item.href)}
                     tooltip={item.description}
+                    data-onboarding={`sidebar-${item.name.toLowerCase()}`}
                   >
                     <Link to={item.href} onClick={handleNavigate}>
                       <item.icon className="h-5 w-5" />
@@ -278,6 +306,7 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
                         asChild
                         isActive={isCurrentPage(item.href)}
                         tooltip={item.description}
+                        data-onboarding={`sidebar-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
                       >
                         <Link to={item.href}>
                           <item.icon className="h-5 w-5" />
@@ -309,6 +338,7 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
               asChild
               isActive={isCurrentPage('/notifications/settings')}
               tooltip="Notification Settings"
+              data-onboarding="sidebar-notifications-settings"
             >
               <Link to="/notifications/settings" onClick={handleNavigate}>
                 <Bell className="h-5 w-5" />
@@ -318,7 +348,10 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
           </SidebarMenuItem>
           
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Settings">
+            <SidebarMenuButton 
+              tooltip="Settings"
+              data-onboarding="sidebar-settings"
+            >
               <Settings className="h-5 w-5" />
               <span>Settings</span>
             </SidebarMenuButton>
@@ -329,6 +362,7 @@ export function AppSidebar({ variant = 'sidebar' }: AppSidebarProps) {
               onClick={handleSignOut}
               tooltip="Sign out"
               className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              data-onboarding="sidebar-sign-out"
             >
               <LogOut className="h-5 w-5" />
               <span>Sign Out</span>

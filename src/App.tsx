@@ -5,9 +5,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { OnboardingProvider } from "@/contexts/OnboardingContext";
+import OnboardingTour from "@/components/OnboardingTour";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import AdminManageDevices from "./pages/AdminManageDevices";
 import Devices from "./pages/Devices";
 import DeviceDetails from "./pages/DeviceDetails";
 import Profile from "./pages/Profile";
@@ -45,13 +48,17 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 };
 
 // Create an admin-only route component
-const AdminRoute = () => {
-  return (
-    <ProtectedRoute>
-      <Admin />
-    </ProtectedRoute>
-  );
-};
+const AdminRoute = () => (
+  <ProtectedRoute>
+    <Admin />
+  </ProtectedRoute>
+);
+
+const AdminManageDevicesRoute = () => (
+  <ProtectedRoute>
+    <AdminManageDevices />
+  </ProtectedRoute>
+);
 
 const AppRoutes = () => {
   return (
@@ -110,7 +117,8 @@ const AppRoutes = () => {
       } />
       
       <Route path="/admin" element={<AdminRoute />} />
-      
+      <Route path="/admin/devices" element={<AdminManageDevicesRoute />} />
+
       {/* Catch-all routes */}
       <Route path="/" element={<Navigate to="/" replace />} />
       <Route path="*" element={<NotFound />} />
@@ -123,11 +131,14 @@ const App = () => (
     <ThemeProvider defaultTheme="system">
       <TooltipProvider>
         <AuthProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-          <Toaster />
-          <Sonner />
+          <OnboardingProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+            <OnboardingTour />
+            <Toaster />
+            <Sonner />
+          </OnboardingProvider>
         </AuthProvider>
       </TooltipProvider>
     </ThemeProvider>
