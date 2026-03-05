@@ -274,11 +274,13 @@ const AdminManageDevices = () => {
   };
 
   const downloadSampleCsv = () => {
+    // New format: input_id (required), uuid (optional), device_type (optional; SOIL or AIR)
     const header = "input_id,uuid,device_type\n";
     const rows = [
       "092515588C814131,SOIL_Serial000001,SOIL",
       "092515588C814132,SOIL_Serial000002,SOIL",
       "092515588C814133,,AIR",
+      "092515588C814134,,",
     ].join("\n");
     const csv = header + rows;
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
