@@ -68,63 +68,43 @@ const Index = () => {
     setAlertsEnabled(JSON.parse(localStorage.getItem("settings.alertsEnabled") ?? "true"));
   }, []);
 
-  // Memoized calculation of average metrics using all devices
-  const averageMetrics = useMemo(() => {
-    if (allDevices.length === 0) {
-      return {
-        temperature: 0,
-        humidity: 0,
-        pressure: 0,
-        dewPoint: 0,
-      };
-    }
-
-    // Filter devices that have valid readings with actual numeric values
-    const devicesWithReadings = allDevices.filter(device => 
-      device.latest_reading && 
-      device.latest_reading.temperature != null &&
-      device.latest_reading.humidity != null &&
-      device.latest_reading.pressure != null &&
-      device.latest_reading.dew_point != null
+  // Per–device-type averages: only use metrics that apply to each type (no mixing air/soil columns).
+  const { airMetrics, soilMetrics } = useMemo(() => {
+    const airDevices = allDevices.filter(
+      (d: { device_type?: string; latest_reading?: Record<string, unknown> }) =>
+        d.device_type === 'AIR' &&
+        d.latest_reading &&
+        d.latest_reading.temperature != null &&
+        d.latest_reading.humidity != null &&
+        d.latest_reading.pressure != null &&
+        d.latest_reading.dew_point != null
     );
-
-    if (devicesWithReadings.length === 0) {
-      return {
-        temperature: 0,
-        humidity: 0,
-        pressure: 0,
-        dewPoint: 0,
-      };
-    }
-
-    // Calculate averages only from devices with valid readings
-    const temperatureSum = devicesWithReadings.reduce((sum, device) => sum + device.latest_reading.temperature, 0);
-    const humiditySum = devicesWithReadings.reduce((sum, device) => sum + device.latest_reading.humidity, 0);
-    const pressureSum = devicesWithReadings.reduce((sum, device) => sum + device.latest_reading.pressure, 0);
-    const dewPointSum = devicesWithReadings.reduce((sum, device) => sum + device.latest_reading.dew_point, 0);
-
-    const averages = {
-      temperature: temperatureSum / devicesWithReadings.length,
-      humidity: humiditySum / devicesWithReadings.length,
-      pressure: pressureSum / devicesWithReadings.length,
-      dewPoint: dewPointSum / devicesWithReadings.length,
-    };
-
-    // Debug logging
-    console.log('Average calculation debug:', {
-      totalDevices: allDevices.length,
-      devicesWithReadings: devicesWithReadings.length,
-      devicesWithReadingsData: devicesWithReadings.map(d => ({
-        name: d.name,
-        temperature: d.latest_reading?.temperature,
-        humidity: d.latest_reading?.humidity,
-        pressure: d.latest_reading?.pressure,
-        dew_point: d.latest_reading?.dew_point
-      })),
-      averages
-    });
-
-    return averages;
+    const soilDevices = allDevices.filter(
+      (d: { device_type?: string; latest_reading?: Record<string, unknown> }) =>
+        d.device_type === 'SOIL' &&
+        d.latest_reading &&
+        d.latest_reading.soil_temperature != null &&
+        d.latest_reading.soil_moisture_percentage != null
+    );
+    const airMetrics = airDevices.length
+      ? {
+          temperature: airDevices.reduce((s, d) => s + (d.latest_reading!.temperature as number), 0) / airDevices.length,
+          humidity: airDevices.reduce((s, d) => s + (d.latest_reading!.humidity as number), 0) / airDevices.length,
+          pressure: airDevices.reduce((s, d) => s + (d.latest_reading!.pressure as number), 0) / airDevices.length,
+          dewPoint: airDevices.reduce((s, d) => s + (d.latest_reading!.dew_point as number), 0) / airDevices.length,
+        }
+      : null;
+    const soilMetrics = soilDevices.length
+      ? {
+          soilTemperature: soilDevices.reduce((s, d) => s + (d.latest_reading!.soil_temperature as number), 0) / soilDevices.length,
+          soilCapacitance: soilDevices.reduce((s, d) => s + ((d.latest_reading!.soil_capacitance as number) ?? 0), 0) / soilDevices.length,
+          soilMoisture: soilDevices.reduce((s, d) => s + (d.latest_reading!.soil_moisture_percentage as number), 0) / soilDevices.length,
+          batteryVoltage: soilDevices.reduce((s, d) => s + ((d.latest_reading!.battery_voltage as number) ?? 0), 0) / soilDevices.length,
+          battery: soilDevices.reduce((s, d) => s + ((d.latest_reading!.battery_percentage as number) ?? 0), 0) / soilDevices.length,
+          par: soilDevices.reduce((s, d) => s + ((d.latest_reading!.par as number) ?? 0), 0) / soilDevices.length,
+        }
+      : null;
+    return { airMetrics, soilMetrics };
   }, [allDevices]);
 
   // Memoized calculation of online devices using all devices
@@ -279,55 +259,116 @@ const Index = () => {
         
         {/* Dashboard overview section: metrics + status (tour target) */}
         <section className="space-y-4" data-onboarding="dashboard-overview">
-        {/* Overview Cards - 8 cards with relevant readings */}
+        {/* Overview Cards - only show columns for each device type (air vs soil) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {/* Temperature Card */}
-          <Card className="glass-card p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 rounded temp-gradient text-white">
-                <Thermometer className="h-3 w-3" />
-              </div>
-              <h3 className="font-semibold text-sm">Temperature</h3>
-            </div>
-            <p className="text-2xl font-bold">{averageMetrics.temperature.toFixed(1)}°C</p>
-            <p className="text-xs text-muted-foreground">Current average</p>
-          </Card>
-
-          {/* Humidity Card */}
-          <Card className="glass-card p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 rounded humidity-gradient text-white">
-                <Droplets className="h-3 w-3" />
-              </div>
-              <h3 className="font-semibold text-sm">Humidity</h3>
-            </div>
-            <p className="text-2xl font-bold">{averageMetrics.humidity.toFixed(1)}%</p>
-            <p className="text-xs text-muted-foreground">Current average</p>
-          </Card>
-
-          {/* Pressure Card */}
-          <Card className="glass-card p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 rounded pressure-gradient text-white">
-                <Gauge className="h-3 w-3" />
-              </div>
-              <h3 className="font-semibold text-sm">Pressure</h3>
-            </div>
-            <p className="text-2xl font-bold">{averageMetrics.pressure.toFixed(0)} hPa</p>
-            <p className="text-xs text-muted-foreground">Current average</p>
-          </Card>
-
-          {/* Dew Point Card */}
-          <Card className="glass-card p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 rounded dewpoint-gradient text-white">
-                <Cloud className="h-3 w-3" />
-              </div>
-              <h3 className="font-semibold text-sm">Dew Point</h3>
-            </div>
-            <p className="text-2xl font-bold">{averageMetrics.dewPoint.toFixed(1)}°C</p>
-            <p className="text-xs text-muted-foreground">Current average</p>
-          </Card>
+          {airMetrics && (
+            <>
+              <Card className="glass-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded temp-gradient text-white">
+                    <Thermometer className="h-3 w-3" />
+                  </div>
+                  <h3 className="font-semibold text-sm">Air Temp</h3>
+                </div>
+                <p className="text-2xl font-bold">{airMetrics.temperature.toFixed(1)}°C</p>
+                <p className="text-xs text-muted-foreground">Air sensors avg</p>
+              </Card>
+              <Card className="glass-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded humidity-gradient text-white">
+                    <Droplets className="h-3 w-3" />
+                  </div>
+                  <h3 className="font-semibold text-sm">Humidity</h3>
+                </div>
+                <p className="text-2xl font-bold">{airMetrics.humidity.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground">Air sensors avg</p>
+              </Card>
+              <Card className="glass-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded pressure-gradient text-white">
+                    <Gauge className="h-3 w-3" />
+                  </div>
+                  <h3 className="font-semibold text-sm">Pressure</h3>
+                </div>
+                <p className="text-2xl font-bold">{airMetrics.pressure.toFixed(0)} hPa</p>
+                <p className="text-xs text-muted-foreground">Air sensors avg</p>
+              </Card>
+              <Card className="glass-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded dewpoint-gradient text-white">
+                    <Cloud className="h-3 w-3" />
+                  </div>
+                  <h3 className="font-semibold text-sm">Dew Point</h3>
+                </div>
+                <p className="text-2xl font-bold">{airMetrics.dewPoint.toFixed(1)}°C</p>
+                <p className="text-xs text-muted-foreground">Air sensors avg</p>
+              </Card>
+            </>
+          )}
+          {soilMetrics && (
+            <>
+              <Card className="glass-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded temp-gradient text-white">
+                    <Thermometer className="h-3 w-3" />
+                  </div>
+                  <h3 className="font-semibold text-sm">Soil Temp</h3>
+                </div>
+                <p className="text-2xl font-bold">{soilMetrics.soilTemperature.toFixed(1)}°C</p>
+                <p className="text-xs text-muted-foreground">Soil sensors avg</p>
+              </Card>
+              <Card className="glass-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded humidity-gradient text-white">
+                    <Droplets className="h-3 w-3" />
+                  </div>
+                  <h3 className="font-semibold text-sm">Soil Moisture</h3>
+                </div>
+                <p className="text-2xl font-bold">{soilMetrics.soilMoisture.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground">Soil sensors avg</p>
+              </Card>
+              <Card className="glass-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded bg-gradient-to-br from-amber-600 to-amber-800 text-white">
+                    <Activity className="h-3 w-3" />
+                  </div>
+                  <h3 className="font-semibold text-sm">Soil Capacitance</h3>
+                </div>
+                <p className="text-2xl font-bold">{soilMetrics.soilCapacitance.toFixed(1)}</p>
+                <p className="text-xs text-muted-foreground">Soil sensors avg</p>
+              </Card>
+              <Card className="glass-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+                    <Activity className="h-3 w-3" />
+                  </div>
+                  <h3 className="font-semibold text-sm">Battery Voltage</h3>
+                </div>
+                <p className="text-2xl font-bold">{soilMetrics.batteryVoltage.toFixed(2)} V</p>
+                <p className="text-xs text-muted-foreground">Soil sensors avg</p>
+              </Card>
+              <Card className="glass-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+                    <Activity className="h-3 w-3" />
+                  </div>
+                  <h3 className="font-semibold text-sm">Battery</h3>
+                </div>
+                <p className="text-2xl font-bold">{soilMetrics.battery.toFixed(0)}%</p>
+                <p className="text-xs text-muted-foreground">Soil sensors avg</p>
+              </Card>
+              <Card className="glass-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded bg-gradient-to-br from-yellow-400 to-orange-500 text-white">
+                    <Activity className="h-3 w-3" />
+                  </div>
+                  <h3 className="font-semibold text-sm">PAR</h3>
+                </div>
+                <p className="text-2xl font-bold">{soilMetrics.par.toFixed(0)} µmol</p>
+                <p className="text-xs text-muted-foreground">Soil sensors avg</p>
+              </Card>
+            </>
+          )}
 
           {/* Device Status Card */}
           <Card className="glass-card p-4">

@@ -186,7 +186,7 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
           <div className="grid grid-cols-2 gap-4 mb-4">
             {device.device_type === 'SOIL' ? (
               <>
-                {/* Soil Device - Show soil_temperature, soil_moisture, battery_percentage, PAR */}
+                {/* Soil Device: soil_temperature, soil_capacitance, soil_moisture_percentage, battery_voltage + existing (battery %, PAR) */}
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded temp-gradient text-white">
                     <Thermometer className="h-3 w-3" />
@@ -198,12 +198,32 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded bg-gradient-to-br from-amber-600 to-amber-800 text-white">
+                    <Battery className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Soil Capacitance</p>
+                    <p className="font-semibold">{device.latest_reading.soil_capacitance != null ? device.latest_reading.soil_capacitance.toFixed(1) : '-' }</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded humidity-gradient text-white">
                     <Droplets className="h-3 w-3" />
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Soil Moisture</p>
                     <p className="font-semibold">{device.latest_reading.soil_moisture_percentage != null ? device.latest_reading.soil_moisture_percentage.toFixed(1) : '-' }%</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+                    <Battery className="h-3 w-3" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Battery Voltage</p>
+                    <p className="font-semibold">{device.latest_reading.battery_voltage != null ? device.latest_reading.battery_voltage.toFixed(2) : '-' } V</p>
                   </div>
                 </div>
 

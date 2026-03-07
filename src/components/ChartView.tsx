@@ -198,6 +198,110 @@ function aggregateReadings(
   return result.sort((a, b) => a.timeDate.getTime() - b.timeDate.getTime());
 }
 
+type SoilChartPoint = { time: string; timeDate: Date; soilTemperature: number; soilCapacitance: number; soilMoisture: number; batteryVoltage: number; battery: number; par: number };
+
+function aggregateReadingsSoil(
+  readings: Reading[],
+  rangeKind: RangeKind,
+  timeRange: string,
+  customDateRange?: DateRange
+): SoilChartPoint[] {
+  const valid = (readings ?? []).filter(
+    (r) => r != null && (r.timestamp != null || r.created_at != null)
+  );
+  if (valid.length === 0 && rangeKind !== 'day') return [];
+
+  const buckets = new Map<
+    string,
+    { date: Date; soilTemps: number[]; soilCaps: number[]; soilMoists: number[]; batteryVs: number[]; batteries: number[]; pars: number[] }
+  >();
+
+  for (const r of valid) {
+    const ts = r.timestamp ?? r.created_at ?? '';
+    const date = new Date(ts);
+    if (Number.isNaN(date.getTime())) continue;
+    const key = getBucketKey(date, rangeKind);
+    if (!key) continue;
+    const existing = buckets.get(key);
+    const st = r.soil_temperature ?? 0;
+    const sc = r.soil_capacitance ?? 0;
+    const sm = r.soil_moisture_percentage ?? 0;
+    const bv = r.battery_voltage ?? 0;
+    const bat = r.battery_percentage ?? 0;
+    const par = r.par ?? 0;
+    if (!existing) {
+      buckets.set(key, {
+        date,
+        soilTemps: [st],
+        soilCaps: [sc],
+        soilMoists: [sm],
+        batteryVs: [bv],
+        batteries: [bat],
+        pars: [par],
+      });
+    } else {
+      existing.soilTemps.push(st);
+      existing.soilCaps.push(sc);
+      existing.soilMoists.push(sm);
+      existing.batteryVs.push(bv);
+      existing.batteries.push(bat);
+      existing.pars.push(par);
+    }
+  }
+
+  const avg = (arr: number[]) => {
+    const filled = arr.filter((v) => v != null && !Number.isNaN(v));
+    if (filled.length === 0) return 0;
+    return filled.reduce((s, v) => s + v, 0) / filled.length;
+  };
+
+  const result = Array.from(buckets.entries()).map(([, b]) => ({
+    time: formatXLabel(b.date, rangeKind),
+    timeDate: b.date,
+    soilTemperature: avg(b.soilTemps),
+    soilCapacitance: avg(b.soilCaps),
+    soilMoisture: avg(b.soilMoists),
+    batteryVoltage: avg(b.batteryVs),
+    battery: avg(b.batteries),
+    par: avg(b.pars),
+  }));
+
+  if (rangeKind === 'day') {
+    const bounds = getDayRangeBounds(timeRange, customDateRange);
+    const from = bounds?.from ?? (result.length ? new Date(Math.min(...result.map((r) => r.timeDate.getTime()))) : new Date());
+    const to = bounds?.to ?? (result.length ? new Date(Math.max(...result.map((r) => r.timeDate.getTime()))) : new Date());
+    const byDay = new Map<string, SoilChartPoint>();
+    result.forEach((row) => {
+      const dayKey = startOfDay(row.timeDate).toISOString();
+      byDay.set(dayKey, row);
+    });
+    let d = from.getTime();
+    const end = to.getTime();
+    const filled: SoilChartPoint[] = [];
+    while (d <= end) {
+      const day = new Date(d);
+      const dayKey = startOfDay(day).toISOString();
+      const existing = byDay.get(dayKey);
+      filled.push(
+        existing ?? {
+          time: format(day, 'MMM d'),
+          timeDate: day,
+          soilTemperature: 0,
+          soilCapacitance: 0,
+          soilMoisture: 0,
+          batteryVoltage: 0,
+          battery: 0,
+          par: 0,
+        }
+      );
+      d = addDays(day, 1).getTime();
+    }
+    return filled.sort((a, b) => a.timeDate.getTime() - b.timeDate.getTime());
+  }
+
+  return result.sort((a, b) => a.timeDate.getTime() - b.timeDate.getTime());
+}
+
 const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: propTimeRange, customDateRange }: ChartViewProps) => {
   const [selectedDevice, setSelectedDevice] = useState(propSelectedDevice || 'all');
   const [timeRange, setTimeRange] = useState(propTimeRange || '24h');
@@ -226,9 +330,14 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
     [timeRange, customDateRange]
   );
 
+  const isSoilChart = devices.length === 1 && devices[0].device_type === 'SOIL';
+
   const chartData = useMemo(
-    () => aggregateReadings(readings, rangeKind, timeRange ?? '24h', customDateRange),
-    [readings, rangeKind, timeRange, customDateRange]
+    () =>
+      isSoilChart
+        ? aggregateReadingsSoil(readings, rangeKind, timeRange ?? '24h', customDateRange)
+        : aggregateReadings(readings, rangeKind, timeRange ?? '24h', customDateRange),
+    [readings, rangeKind, timeRange, customDateRange, isSoilChart]
   );
 
   // Axis label at the bottom of the graph (below the ticks)
@@ -290,177 +399,193 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
 
       {chartData.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Temperature Chart */}
-          <Card className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full temp-gradient"></div>
-              Temperature
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis 
-                    dataKey="time" 
-                    tick={{ fontSize: 12 }}
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 12 }}
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="temperature" 
-                    stroke="hsl(var(--temperature))"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            {xAxisLabel && (
-              <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">
-                {xAxisLabel}
-              </p>
-            )}
-          </Card>
-
-          {/* Humidity Chart */}
-          <Card className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full humidity-gradient"></div>
-              Humidity
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis 
-                    dataKey="time" 
-                    tick={{ fontSize: 12 }}
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 12 }}
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="humidity" 
-                    stroke="hsl(var(--humidity))"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            {xAxisLabel && (
-              <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">
-                {xAxisLabel}
-              </p>
-            )}
-          </Card>
-
-          {/* Pressure Chart */}
-          <Card className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full pressure-gradient"></div>
-              Atmospheric Pressure
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis 
-                    dataKey="time" 
-                    tick={{ fontSize: 12 }}
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 12 }}
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="pressure" 
-                    stroke="hsl(var(--pressure))"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            {xAxisLabel && (
-              <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">
-                {xAxisLabel}
-              </p>
-            )}
-          </Card>
-
-          {/* Dew Point Chart */}
-          <Card className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full dewpoint-gradient"></div>
-              Dew Point
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis 
-                    dataKey="time" 
-                    tick={{ fontSize: 12 }}
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 12 }}
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="dewPoint" 
-                    stroke="hsl(var(--dewpoint))"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            {xAxisLabel && (
-              <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">
-                {xAxisLabel}
-              </p>
-            )}
-          </Card>
+          {isSoilChart ? (
+            <>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full temp-gradient"></div>
+                  Soil Temperature
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="soilTemperature" stroke="hsl(var(--temperature))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full humidity-gradient"></div>
+                  Soil Moisture
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="soilMoisture" stroke="hsl(var(--humidity))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-amber-600 to-amber-800"></div>
+                  Soil Capacitance
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="soilCapacitance" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600"></div>
+                  Battery Voltage
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="batteryVoltage" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600"></div>
+                  Battery %
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="battery" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500"></div>
+                  PAR
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="par" stroke="hsl(var(--premium))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+            </>
+          ) : (
+            <>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full temp-gradient"></div>
+                  Temperature
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="temperature" stroke="hsl(var(--temperature))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full humidity-gradient"></div>
+                  Humidity
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="humidity" stroke="hsl(var(--humidity))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full pressure-gradient"></div>
+                  Atmospheric Pressure
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="pressure" stroke="hsl(var(--pressure))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full dewpoint-gradient"></div>
+                  Dew Point
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="dewPoint" stroke="hsl(var(--dewpoint))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+            </>
+          )}
         </div>
       ) : (
         <div className="text-center py-12">

@@ -31,20 +31,38 @@ const DeviceDetails = () => {
     timePreset === 'custom' ? dateRange : undefined
   );
 
+  const isSoil = device?.device_type === 'SOIL';
+
   const averages = useMemo(() => {
     if (!readings.length) {
-      return { temperature: 0, humidity: 0, pressure: 0, dewPoint: 0 };
+      return isSoil
+        ? { soilTemperature: 0, soilCapacitance: 0, soilMoisture: 0, batteryVoltage: 0, battery: 0, par: 0 }
+        : { temperature: 0, humidity: 0, pressure: 0, dewPoint: 0 };
     }
-
+    if (isSoil) {
+      const withSoilTemp = readings.filter(r => r.soil_temperature != null);
+      const withSoilCap = readings.filter(r => r.soil_capacitance != null);
+      const withSoilMoist = readings.filter(r => r.soil_moisture_percentage != null);
+      const withBatteryV = readings.filter(r => r.battery_voltage != null);
+      const withBattery = readings.filter(r => r.battery_percentage != null);
+      const withPar = readings.filter(r => r.par != null);
+      return {
+        soilTemperature: withSoilTemp.length ? withSoilTemp.reduce((s, r) => s + (r.soil_temperature ?? 0), 0) / withSoilTemp.length : 0,
+        soilCapacitance: withSoilCap.length ? withSoilCap.reduce((s, r) => s + (r.soil_capacitance ?? 0), 0) / withSoilCap.length : 0,
+        soilMoisture: withSoilMoist.length ? withSoilMoist.reduce((s, r) => s + (r.soil_moisture_percentage ?? 0), 0) / withSoilMoist.length : 0,
+        batteryVoltage: withBatteryV.length ? withBatteryV.reduce((s, r) => s + (r.battery_voltage ?? 0), 0) / withBatteryV.length : 0,
+        battery: withBattery.length ? withBattery.reduce((s, r) => s + (r.battery_percentage ?? 0), 0) / withBattery.length : 0,
+        par: withPar.length ? withPar.reduce((s, r) => s + (r.par ?? 0), 0) / withPar.length : 0,
+      };
+    }
     const valid = readings.filter(r => r.temperature != null && r.humidity != null && r.pressure != null && r.dew_point != null);
     if (!valid.length) return { temperature: 0, humidity: 0, pressure: 0, dewPoint: 0 };
-
     const t = valid.reduce((s, r) => s + (r.temperature || 0), 0) / valid.length;
     const h = valid.reduce((s, r) => s + (r.humidity || 0), 0) / valid.length;
     const p = valid.reduce((s, r) => s + (r.pressure || 0), 0) / valid.length;
     const d = valid.reduce((s, r) => s + (r.dew_point || 0), 0) / valid.length;
     return { temperature: t, humidity: h, pressure: p, dewPoint: d };
-  }, [readings]);
+  }, [readings, isSoil]);
 
   // Export handlers
   const handleExportCSV = () => {
@@ -58,7 +76,7 @@ const DeviceDetails = () => {
     }
 
     try {
-      const csvContent = exportToCSV(readings, device?.name);
+      const csvContent = exportToCSV(readings, device?.name, device?.device_type);
       const filename = generateFilename(device?.name || 'device', 'csv', dateRange);
       downloadFile(csvContent, filename, 'text/csv');
       toast({
@@ -86,7 +104,7 @@ const DeviceDetails = () => {
     }
 
     try {
-      const jsonContent = exportToJSON(readings, device?.name);
+      const jsonContent = exportToJSON(readings, device?.name, device?.device_type);
       const filename = generateFilename(device?.name || 'device', 'json', dateRange);
       downloadFile(jsonContent, filename, 'application/json');
       toast({
@@ -198,40 +216,95 @@ const DeviceDetails = () => {
           )}
         </div>
 
-        {/* Averages */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="p-4">
-            <p className="text-xs text-muted-foreground">Temperature</p>
-            {isFetching && !readings.length ? (
-              <div className="h-8 bg-muted animate-pulse rounded"></div>
-            ) : (
-              <p className="text-2xl font-semibold">{averages.temperature.toFixed(1)}°C</p>
-            )}
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-muted-foreground">Humidity</p>
-            {isFetching && !readings.length ? (
-              <div className="h-8 bg-muted animate-pulse rounded"></div>
-            ) : (
-              <p className="text-2xl font-semibold">{averages.humidity.toFixed(1)}%</p>
-            )}
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-muted-foreground">Pressure</p>
-            {isFetching && !readings.length ? (
-              <div className="h-8 bg-muted animate-pulse rounded"></div>
-            ) : (
-              <p className="text-2xl font-semibold">{averages.pressure.toFixed(0)} hPa</p>
-            )}
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-muted-foreground">Dew Point</p>
-            {isFetching && !readings.length ? (
-              <div className="h-8 bg-muted animate-pulse rounded"></div>
-            ) : (
-              <p className="text-2xl font-semibold">{averages.dewPoint.toFixed(1)}°C</p>
-            )}
-          </Card>
+        {/* Averages - by device type */}
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${isSoil ? 'lg:grid-cols-6' : 'lg:grid-cols-4'}`}>
+          {isSoil ? (
+            <>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Soil Temp</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { soilTemperature: number }).soilTemperature.toFixed(1)}°C</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Soil Capacitance</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { soilCapacitance: number }).soilCapacitance.toFixed(1)}</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Soil Moisture</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { soilMoisture: number }).soilMoisture.toFixed(1)}%</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Battery Voltage</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { batteryVoltage: number }).batteryVoltage.toFixed(2)} V</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Battery</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { battery: number }).battery.toFixed(0)}%</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">PAR</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { par: number }).par.toFixed(0)} µmol</p>
+                )}
+              </Card>
+            </>
+          ) : (
+            <>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Temperature</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { temperature: number }).temperature.toFixed(1)}°C</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Humidity</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { humidity: number }).humidity.toFixed(1)}%</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Pressure</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { pressure: number }).pressure.toFixed(0)} hPa</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Dew Point</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { dewPoint: number }).dewPoint.toFixed(1)}°C</p>
+                )}
+              </Card>
+            </>
+          )}
         </div>
 
         {/* Readings Table or Charts */}
@@ -279,16 +352,29 @@ const DeviceDetails = () => {
                   <thead>
                     <tr className="text-left">
                       <th className="px-4 py-2">Timestamp</th>
-                      <th className="px-4 py-2">Temp (°C)</th>
-                      <th className="px-4 py-2">Humidity (%)</th>
-                      <th className="px-4 py-2">Pressure (hPa)</th>
-                      <th className="px-4 py-2">Dew Point (°C)</th>
-                      {isPremium && (
+                      {isSoil ? (
                         <>
-                          <th className="px-4 py-2">CO₂ (ppm)</th>
-                          <th className="px-4 py-2">Light (lux)</th>
+                          <th className="px-4 py-2">Soil Temp (°C)</th>
+                          <th className="px-4 py-2">Soil Capacitance</th>
                           <th className="px-4 py-2">Soil Moist (%)</th>
+                          <th className="px-4 py-2">Battery Voltage (V)</th>
                           <th className="px-4 py-2">Battery (%)</th>
+                          <th className="px-4 py-2">PAR (µmol)</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="px-4 py-2">Temp (°C)</th>
+                          <th className="px-4 py-2">Humidity (%)</th>
+                          <th className="px-4 py-2">Pressure (hPa)</th>
+                          <th className="px-4 py-2">Dew Point (°C)</th>
+                          {isPremium && (
+                            <>
+                              <th className="px-4 py-2">CO₂ (ppm)</th>
+                              <th className="px-4 py-2">Light (lux)</th>
+                              <th className="px-4 py-2">Soil Moist (%)</th>
+                              <th className="px-4 py-2">Battery (%)</th>
+                            </>
+                          )}
                         </>
                       )}
                     </tr>
@@ -297,16 +383,29 @@ const DeviceDetails = () => {
                     {readings.map(r => (
                       <tr key={r.id} className="border-t">
                         <td className="px-4 py-2 whitespace-nowrap">{new Date(r.timestamp).toLocaleString()}</td>
-                        <td className="px-4 py-2">{r.temperature?.toFixed(1) ?? '-'}</td>
-                        <td className="px-4 py-2">{r.humidity?.toFixed(1) ?? '-'}</td>
-                        <td className="px-4 py-2">{r.pressure?.toFixed(0) ?? '-'}</td>
-                        <td className="px-4 py-2">{r.dew_point?.toFixed(1) ?? '-'}</td>
-                        {isPremium && (
+                        {isSoil ? (
                           <>
-                            <td className="px-4 py-2">{r.co2 ?? '-'}</td>
-                            <td className="px-4 py-2">{r.light_veml7700 ?? r.light_tsl2591 ?? '-'}</td>
+                            <td className="px-4 py-2">{r.soil_temperature?.toFixed(1) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.soil_capacitance != null ? r.soil_capacitance.toFixed(1) : '-'}</td>
                             <td className="px-4 py-2">{r.soil_moisture_percentage?.toFixed(1) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.battery_voltage != null ? r.battery_voltage.toFixed(2) : '-'}</td>
                             <td className="px-4 py-2">{r.battery_percentage?.toFixed(0) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.par?.toFixed(0) ?? '-'}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-4 py-2">{r.temperature?.toFixed(1) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.humidity?.toFixed(1) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.pressure?.toFixed(0) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.dew_point?.toFixed(1) ?? '-'}</td>
+                            {isPremium && (
+                              <>
+                                <td className="px-4 py-2">{r.co2 ?? '-'}</td>
+                                <td className="px-4 py-2">{r.light_veml7700 ?? r.light_tsl2591 ?? '-'}</td>
+                                <td className="px-4 py-2">{r.soil_moisture_percentage?.toFixed(1) ?? '-'}</td>
+                                <td className="px-4 py-2">{r.battery_percentage?.toFixed(0) ?? '-'}</td>
+                              </>
+                            )}
                           </>
                         )}
                       </tr>
