@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,44 +100,49 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
     }
   };
 
+  const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
+
   return (
     <>
-      <Card className="glass-card p-6 group hover:shadow-lg transition-all duration-300 animate-fade-in">
-        <div className="flex items-start justify-between mb-4">
-          <div className="space-y-1">
-            <h3 className="font-semibold tracking-tight">{device.name}</h3>
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm text-muted-foreground">{device.device_id}</p>
-              <Badge variant="secondary" className="text-xs">
-                {device.device_type === 'AIR' ? '🌬️ Air' : '🌱 Soil'}
-              </Badge>
-              {device.crop_type && (
-                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                  🌾 {device.crop_type}
+      <Link to={`/devices/${device.id}`} className="block outline-none">
+        <Card className="glass-card p-6 group hover:shadow-lg transition-all duration-300 animate-fade-in cursor-pointer h-full">
+          <div className="flex items-start justify-between mb-4">
+            <div className="space-y-1">
+              <h3 className="font-semibold tracking-tight">{device.name}</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm text-muted-foreground">{device.device_id}</p>
+                <Badge variant="secondary" className="text-xs">
+                  {device.device_type === 'AIR' ? '🌬️ Air' : '🌱 Soil'}
                 </Badge>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopyApiKey}
-                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                title="Copy API Key"
-              >
-                <Key className="h-3 w-3 mr-1" />
-                API Key
-              </Button>
+                {device.crop_type && (
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                    🌾 {device.crop_type}
+                  </Badge>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => { stopPropagation(e); handleCopyApiKey(); }}
+                  className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  title="Copy API Key"
+                >
+                  <Key className="h-3 w-3 mr-1" />
+                  API Key
+                </Button>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={device.favorite ? 'default' : 'ghost'}
-              size="sm"
-              className="h-7 px-2"
-              onClick={() => toggleFavorite.mutate({ id: device.id, favorite: !device.favorite })}
-              title={device.favorite ? 'Unfavorite' : 'Mark as favorite'}
-            >
-              <Star className={`h-4 w-4 ${device.favorite ? '' : 'text-muted-foreground'}`} />
-            </Button>
+            <div className="flex items-center gap-2" onClick={stopPropagation}>
+              <Button
+                type="button"
+                variant={device.favorite ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 px-2"
+                onClick={(e) => { stopPropagation(e); toggleFavorite.mutate({ id: device.id, favorite: !device.favorite }); }}
+                title={device.favorite ? 'Unfavorite' : 'Mark as favorite'}
+              >
+                <Star className={`h-4 w-4 ${device.favorite ? '' : 'text-muted-foreground'}`} />
+              </Button>
             <Badge className={isOnline ? "bg-green-500/20 text-green-500" : "bg-red-500/20 text-red-500"}>
               {isOnline ? (
                 <>
@@ -153,7 +159,7 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="focus:outline-none">
+                <Button type="button" variant="ghost" size="sm" className="focus:outline-none" onClick={stopPropagation}>
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -179,10 +185,10 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            </div>
           </div>
-        </div>
 
-        {device.latest_reading ? (
+          {device.latest_reading ? (
           <div className="grid grid-cols-2 gap-4 mb-4">
             {device.device_type === 'SOIL' ? (
               <>
@@ -298,16 +304,17 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
           </div>
         )}
 
-        <div className="pt-4 border-t border-border/50">
-          <p className="text-xs text-muted-foreground">
-            {lastReading ? (
-              <>Last reading: {formatDistanceToNow(lastReading, { addSuffix: true })}</>
-            ) : (
-              "No readings yet"
-            )}
-          </p>
-        </div>
-      </Card>
+          <div className="pt-4 border-t border-border/50">
+            <p className="text-xs text-muted-foreground">
+              {lastReading ? (
+                <>Last reading: {formatDistanceToNow(lastReading, { addSuffix: true })}</>
+              ) : (
+                "No readings yet"
+              )}
+            </p>
+          </div>
+        </Card>
+      </Link>
 
       {/* Rename Device Dialog */}
       <EditDeviceDialog 

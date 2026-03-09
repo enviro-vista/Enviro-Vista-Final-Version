@@ -399,6 +399,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_onboarding: {
+        Row: {
+          id: string
+          user_id: string
+          checklist: Json
+          tour_dismissed: boolean
+          dismissed_tooltips: Json
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          checklist?: Json
+          tour_dismissed?: boolean
+          dismissed_tooltips?: Json
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          checklist?: Json
+          tour_dismissed?: boolean
+          dismissed_tooltips?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       sensor_readings_effective: {

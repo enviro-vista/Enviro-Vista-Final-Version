@@ -38,7 +38,6 @@ const AddDeviceDialog = () => {
   const [name, setName] = useState('');
   const [deviceType, setDeviceType] = useState<'AIR' | 'SOIL'>('AIR');
   const [cropType, setCropType] = useState<string>('');
-  const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const [validationResult, setValidationResult] = useState<{ isValid: boolean; checked: boolean; isUsed?: boolean; macAddress?: string | null } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -157,13 +156,12 @@ const AddDeviceDialog = () => {
     }
     
     try {
-      const res = await addDevice.mutateAsync({ 
+      await addDevice.mutateAsync({ 
         device_id: deviceId.trim(), 
         name: name.trim(), 
         device_type: deviceType,
         crop_type: cropType.trim() || null
       });
-      setDeviceToken(res.token);
       // Mark checklist item as complete
       completeChecklistItem('add-device');
       setDeviceId('');
@@ -171,6 +169,7 @@ const AddDeviceDialog = () => {
       setDeviceType('AIR');
       setCropType('');
       setValidationResult(null);
+      setOpen(false);
     } catch (error) {
       // Error is handled by the mutation
       // Keep the form open so user can fix the issue
@@ -180,7 +179,6 @@ const AddDeviceDialog = () => {
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
       if (!isOpen) {
-        setDeviceToken(null);
         setValidationResult(null);
         setDeviceId('');
         setName('');
@@ -201,11 +199,10 @@ const AddDeviceDialog = () => {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{deviceToken ? 'Device Registered' : 'Add New Device'}</DialogTitle>
+          <DialogTitle>Add New Device</DialogTitle>
         </DialogHeader>
         
-        {!deviceToken ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="device-id">Device ID (QR Code or MAC Address)</Label>
               
@@ -417,37 +414,6 @@ const AddDeviceDialog = () => {
               </Button>
             </div>
           </form>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Copy this device token and paste it into your ESP32 firmware. 
-              Store it securely; you won't be able to view it again.
-            </p>
-            <div className="space-y-2">
-              <Label>Device JWT</Label>
-              <Input 
-                readOnly 
-                value={deviceToken} 
-                onFocus={(e) => e.currentTarget.select()} 
-              />
-              <div className="flex gap-2 justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigator.clipboard.writeText(deviceToken || '')}
-                >
-                  Copy Token
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                >
-                  Done
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );

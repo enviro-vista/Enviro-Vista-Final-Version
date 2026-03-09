@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface OnboardingStep {
   id: string;
@@ -46,10 +47,7 @@ interface OnboardingContextType {
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
-const STORAGE_KEY_PREFIX = 'onboarding_';
-const FIRST_TIME_KEY = 'first_time_user';
-const ONBOARDING_COMPLETE_KEY = 'onboarding_complete';
-const DISMISSED_TOOLTIPS_KEY = 'dismissed_tooltips';
+const ONBOARDING_TABLE = 'user_onboarding';
 
 const defaultChecklist: ChecklistItem[] = [
   {
@@ -91,41 +89,79 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   const [steps, setSteps] = useState<OnboardingStep[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>(defaultChecklist);
   const [dismissedTooltips, setDismissedTooltips] = useState<Set<string>>(new Set());
+  const [tourDismissed, setTourDismissed] = useState(false);
+  const [onboardingLoaded, setOnboardingLoaded] = useState(false);
 
-  // Load state from localStorage
+  // Persist to Supabase (upsert user_onboarding)
+  const upsertOnboarding = useCallback(
+    async (updates: { checklist?: ChecklistItem[]; tour_dismissed?: boolean; dismissed_tooltips?: string[] }) => {
+      if (!user) return;
+      const payload = {
+        user_id: user.id,
+        updated_at: new Date().toISOString(),
+        ...(updates.checklist !== undefined && { checklist: JSON.parse(JSON.stringify(updates.checklist)) }),
+        ...(updates.tour_dismissed !== undefined && { tour_dismissed: updates.tour_dismissed }),
+        ...(updates.dismissed_tooltips !== undefined && { dismissed_tooltips: updates.dismissed_tooltips }),
+      };
+      await supabase.from(ONBOARDING_TABLE).upsert(payload, {
+        onConflict: 'user_id',
+      });
+    },
+    [user]
+  );
+
+  // Load state from Supabase
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setOnboardingLoaded(false);
+      return;
+    }
 
-    const userId = user.id;
-    const firstTime = localStorage.getItem(`${STORAGE_KEY_PREFIX}${userId}_${FIRST_TIME_KEY}`) === null;
-    const completed = localStorage.getItem(`${STORAGE_KEY_PREFIX}${userId}_${ONBOARDING_COMPLETE_KEY}`) === 'true';
-    
-    const savedChecklist = localStorage.getItem(`${STORAGE_KEY_PREFIX}${userId}_checklist`);
-    if (savedChecklist) {
-      try {
-        setChecklist(JSON.parse(savedChecklist));
-      } catch (e) {
-        console.error('Failed to parse saved checklist:', e);
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from(ONBOARDING_TABLE)
+        .select('checklist, tour_dismissed, dismissed_tooltips')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (error) {
+        console.error('Failed to load onboarding state:', error);
+        setOnboardingLoaded(true);
+        return;
       }
-    }
 
-    const savedDismissed = localStorage.getItem(`${STORAGE_KEY_PREFIX}${userId}_${DISMISSED_TOOLTIPS_KEY}`);
-    if (savedDismissed) {
-      try {
-        setDismissedTooltips(new Set(JSON.parse(savedDismissed)));
-      } catch (e) {
-        console.error('Failed to parse dismissed tooltips:', e);
+      if (data) {
+        if (Array.isArray(data.checklist) && data.checklist.length > 0) {
+          const saved = data.checklist as unknown as ChecklistItem[];
+          const merged = defaultChecklist.map(
+            (d) => saved.find((s) => s.id === d.id) ?? d
+          );
+          setChecklist(merged);
+        }
+        if (data.tour_dismissed === true) {
+          setTourDismissed(true);
+        }
+        if (Array.isArray(data.dismissed_tooltips)) {
+          setDismissedTooltips(new Set(data.dismissed_tooltips as string[]));
+        }
       }
-    }
-
-    // Auto-start tour for first-time users
-    if (firstTime && !completed) {
-      // Delay to ensure page is loaded
-      setTimeout(() => {
-        startDefaultTour();
-      }, 1000);
-    }
+      setOnboardingLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
+
+  // Auto-start tour only for first-time users who haven't dismissed/skipped (after load from Supabase)
+  useEffect(() => {
+    if (!user || !onboardingLoaded || tourDismissed) return;
+    const timer = setTimeout(() => {
+      startDefaultTour();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [user, onboardingLoaded, tourDismissed]);
 
   const startDefaultTour = () => {
     const defaultSteps: OnboardingStep[] = [
@@ -312,47 +348,35 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   const skipTour = () => {
     setIsTourActive(false);
     setCurrentStep(0);
+    setTourDismissed(true);
+    upsertOnboarding({ tour_dismissed: true });
   };
 
   const completeTour = () => {
     setIsTourActive(false);
     setCurrentStep(0);
-    if (user) {
-      const userId = user.id;
-      localStorage.setItem(`${STORAGE_KEY_PREFIX}${userId}_${ONBOARDING_COMPLETE_KEY}`, 'true');
-      localStorage.setItem(`${STORAGE_KEY_PREFIX}${userId}_${FIRST_TIME_KEY}`, 'false');
-    }
+    setTourDismissed(true);
+    upsertOnboarding({ tour_dismissed: true });
   };
 
   const completeChecklistItem = (id: string) => {
     setChecklist(prev => {
-      const updated = prev.map(item => 
+      const updated = prev.map(item =>
         item.id === id ? { ...item, completed: true } : item
       );
-      
-      if (user) {
-        const userId = user.id;
-        localStorage.setItem(`${STORAGE_KEY_PREFIX}${userId}_checklist`, JSON.stringify(updated));
-      }
-      
+      upsertOnboarding({ checklist: updated });
       return updated;
     });
   };
 
   const resetChecklist = () => {
     setChecklist(defaultChecklist);
-    if (user) {
-      const userId = user.id;
-      localStorage.removeItem(`${STORAGE_KEY_PREFIX}${userId}_checklist`);
-    }
+    upsertOnboarding({ checklist: defaultChecklist });
   };
 
   const markOnboardingComplete = () => {
-    if (user) {
-      const userId = user.id;
-      localStorage.setItem(`${STORAGE_KEY_PREFIX}${userId}_${ONBOARDING_COMPLETE_KEY}`, 'true');
-      localStorage.setItem(`${STORAGE_KEY_PREFIX}${userId}_${FIRST_TIME_KEY}`, 'false');
-    }
+    setTourDismissed(true);
+    upsertOnboarding({ tour_dismissed: true });
   };
 
   const showTooltip = (id: string): boolean => {
@@ -363,23 +387,13 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     setDismissedTooltips(prev => {
       const updated = new Set(prev);
       updated.add(id);
-      
-      if (user) {
-        const userId = user.id;
-        localStorage.setItem(`${STORAGE_KEY_PREFIX}${userId}_${DISMISSED_TOOLTIPS_KEY}`, JSON.stringify(Array.from(updated)));
-      }
-      
+      upsertOnboarding({ dismissed_tooltips: Array.from(updated) });
       return updated;
     });
   };
 
-  const isFirstTimeUser = user 
-    ? localStorage.getItem(`${STORAGE_KEY_PREFIX}${user.id}_${FIRST_TIME_KEY}`) === null
-    : false;
-
-  const hasCompletedOnboarding = user
-    ? localStorage.getItem(`${STORAGE_KEY_PREFIX}${user.id}_${ONBOARDING_COMPLETE_KEY}`) === 'true'
-    : false;
+  const isFirstTimeUser = user ? !tourDismissed : false;
+  const hasCompletedOnboarding = user ? tourDismissed : false;
 
   return (
     <OnboardingContext.Provider
