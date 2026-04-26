@@ -447,7 +447,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
                     <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                       <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <YAxis domain={[700, 2900]} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis domain={[800, 2800]} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
                       <Line type="monotone" dataKey="soilCapacitance" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
                     </LineChart>
