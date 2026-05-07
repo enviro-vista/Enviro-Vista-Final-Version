@@ -27,9 +27,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { AppLayout } from "@/components/AppLayout";
-import { Shield, Cpu, Loader2, Plus, Upload, Download, Pencil, Trash2, Printer } from "lucide-react";
+import { Shield, Cpu, Loader2, Plus, Upload, Download, Pencil, Trash2, Printer, ScanLine, X, AlertTriangle } from "lucide-react";
 import QRCode from "qrcode";
 import type { Database } from "@/integrations/supabase/types";
+import { Scanner } from "@yudiel/react-qr-scanner";
 
 type AvailableDeviceRow = Database["public"]["Tables"]["available_devices"]["Row"];
 
@@ -76,6 +77,8 @@ const AdminManageDevices = () => {
     number: "",
     input_id: "",
   });
+  const [isScanningInputId, setIsScanningInputId] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
   const [editingRow, setEditingRow] = useState<AvailableDeviceRow | null>(null);
@@ -174,6 +177,8 @@ const AdminManageDevices = () => {
         description: `${data?.device_name ?? deviceName} has been added to the registry.`,
       });
       setForm({ deviceType: "SOIL", number: "", input_id: "" });
+      setIsScanningInputId(false);
+      setScanError(null);
       await fetchAvailableDevices();
     } catch (err: unknown) {
       const message = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Failed to add device.";
@@ -185,6 +190,30 @@ const AdminManageDevices = () => {
     } finally {
       setFormSubmitting(false);
     }
+  };
+
+  const handleInputIdScan = (result: { rawValue: string }[]) => {
+    if (!result || result.length === 0) return;
+    const scannedValue = result[0].rawValue?.trim();
+    if (!scannedValue) return;
+    setForm((prev) => ({ ...prev, input_id: scannedValue }));
+    setScanError(null);
+    setIsScanningInputId(false);
+  };
+
+  const handleInputIdScanError = (error: unknown) => {
+    console.error("Scanner error:", error);
+    if (error instanceof Error) {
+      if (error.name === "NotAllowedError") {
+        setScanError("Camera permission denied. Please allow camera access.");
+      } else if (error.name === "NotFoundError") {
+        setScanError("No camera found on this device.");
+      } else {
+        setScanError(error.message || "Scanner error occurred.");
+      }
+      return;
+    }
+    setScanError("Scanner error occurred.");
   };
 
   const openEdit = (row: AvailableDeviceRow) => {
@@ -453,16 +482,68 @@ const AdminManageDevices = () => {
               </div>
               <div className="space-y-2 sm:col-span-2 lg:col-span-1">
                 <Label htmlFor="input_id">Input ID / QR code</Label>
-                <Input
-                  id="input_id"
-                  required
-                  placeholder="e.g. 092515588C814131"
-                  value={form.input_id}
-                  onChange={(e) => setForm((f) => ({ ...f, input_id: e.target.value }))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Same value is used as QR code. MAC is derived from the last 12 characters.
-                </p>
+                {!isScanningInputId ? (
+                  <>
+                    <div className="flex gap-2">
+                      <Input
+                        id="input_id"
+                        required
+                        placeholder="e.g. 092515588C814131"
+                        value={form.input_id}
+                        onChange={(e) => setForm((f) => ({ ...f, input_id: e.target.value }))}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        title="Scan QR code"
+                        onClick={() => {
+                          setScanError(null);
+                          setIsScanningInputId(true);
+                        }}
+                      >
+                        <ScanLine className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Same value is used as QR code. MAC is derived from the last 12 characters.
+                    </p>
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="rounded-lg overflow-hidden border-2 border-primary" style={{ minHeight: "220px" }}>
+                      <Scanner
+                        onScan={handleInputIdScan}
+                        onError={handleInputIdScanError}
+                        constraints={{ facingMode: "environment" }}
+                        formats={["qr_code", "data_matrix"]}
+                        styles={{
+                          container: { width: "100%", height: "220px" },
+                          video: { width: "100%", height: "100%", objectFit: "cover" },
+                        }}
+                        components={{ torch: true, finder: true, zoom: true }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">Point camera at the device QR code</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsScanningInputId(false)}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {scanError && (
+                  <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-500 p-2 rounded-md">
+                    <AlertTriangle className="h-3 w-3" />
+                    {scanError}
+                  </div>
+                )}
               </div>
               <div className="sm:col-span-2 lg:col-span-3">
                 <Button type="submit" disabled={formSubmitting}>

@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { SignJWT } from 'jose';
 
 export interface Device {
   id: string;
@@ -37,8 +36,7 @@ export const useDevices = () => {
       const { data: devices, error: devicesError } = await (supabase
         .from('devices')
         .select('*') as any)
-        .order('created_at', { ascending: false })
-        .limit(2); // Limit to 2 devices for dashboard
+        .order('created_at', { ascending: false });
 
       if (devicesError) throw devicesError;
 
@@ -302,44 +300,22 @@ export const useAddDevice = () => {
       const { data: device, error: insertError } = await supabase
         .from('devices')
         .insert([insertData])
-        .select()
+        .select('id, device_id, apikey, name, device_type, owner_id')
         .single();
 
       if (insertError) {
         throw insertError;
       }
 
-      // Mark device as used in available_devices table
-      const { error: updateError } = await supabase
-        .from('available_devices')
-        .update({ is_used: true } as any)
-        .eq('id', availableDevice.id);
+      // is_used is set by DB trigger (mark_available_device_used_after_device_insert);
+      // client cannot UPDATE available_devices due to RLS.
 
-      if (updateError) {
-        console.error('Failed to mark device as used:', updateError);
-        // Don't throw error here - device is already registered
-        // This is just a flag update
-      }
-
-      // Generate JWT token client-side
-      const secret = new TextEncoder().encode(
-        import.meta.env.VITE_DEVICE_JWT_SECRET || 't3fYXmyny2Hvf+ZBd4jUp3ixZRySEnNtx7iArRZuCdqtmtBR7KvNLn/4G957qBHDnK1uovHokQITGQF8behvVA=='
-      );
-      
-      const payload = { 
-        device_id: device.device_id, 
-        owner_id: user.id,
-        exp: Math.floor(Date.now() / 1000) + (10 * 365 * 24 * 60 * 60) // 10 years
-      };
-      
-      const token = await new SignJWT(payload)
-        .setProtectedHeader({ alg: 'HS256' })
-        .sign(secret);
-
-      return { token, device };
+      return { device };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] });
+      queryClient.invalidateQueries({ queryKey: ['all-devices'] });
+      queryClient.invalidateQueries({ queryKey: ['favorite-devices'] });
       toast({
         title: "Success",
         description: "Device added successfully!",

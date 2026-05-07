@@ -46,7 +46,9 @@ export type Database = {
       }
       devices: {
         Row: {
+          apikey: string
           created_at: string | null
+          crop_type: string | null
           device_id: string
           device_type: string
           id: string
@@ -54,9 +56,13 @@ export type Database = {
           owner_id: string
           updated_at: string | null
           available_device_id: string | null
+          soil_calibration_dry_value: number | null
+          soil_calibration_wet_value: number | null
         }
         Insert: {
+          apikey?: string
           created_at?: string | null
+          crop_type?: string | null
           device_id: string
           device_type?: string
           id?: string
@@ -64,9 +70,13 @@ export type Database = {
           owner_id: string
           updated_at?: string | null
           available_device_id?: string | null
+          soil_calibration_dry_value?: number | null
+          soil_calibration_wet_value?: number | null
         }
         Update: {
+          apikey?: string
           created_at?: string | null
+          crop_type?: string | null
           device_id?: string
           device_type?: string
           id?: string
@@ -74,6 +84,8 @@ export type Database = {
           owner_id?: string
           updated_at?: string | null
           available_device_id?: string | null
+          soil_calibration_dry_value?: number | null
+          soil_calibration_wet_value?: number | null
         }
         Relationships: [
           {

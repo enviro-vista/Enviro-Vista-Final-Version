@@ -19,7 +19,8 @@ import {
   Battery,
   Zap,
   Wind,
-  Sun
+  Sun,
+  SlidersHorizontal,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Device } from "@/hooks/useDevices";
@@ -33,6 +34,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDeleteDevice, useToggleFavorite } from "@/hooks/useDevices";
 import EditDeviceDialog from "./EditDeviceDialog";
+import { SoilCalibrationModal } from "./SoilCalibrationModal";
 
 interface DeviceCardProps {
   device: Device;
@@ -42,6 +44,7 @@ interface DeviceCardProps {
 const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [soilCalibrationOpen, setSoilCalibrationOpen] = useState(false);
   const { toast } = useToast();
   const deleteDevice = useDeleteDevice();
   const toggleFavorite = useToggleFavorite();
@@ -101,6 +104,14 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
   };
 
   const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
+
+  const handleRecalibrationConfirmed = async () => {
+    toast({
+      title: "Calibration confirmed",
+      description: `You confirmed successful recalibration for "${device.name}".`,
+    });
+    onDeviceUpdated();
+  };
 
   return (
     <>
@@ -168,6 +179,17 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
                   <Pencil className="h-4 w-4 mr-2" />
                   Rename Device
                 </DropdownMenuItem>
+                {device.device_type === "SOIL" && (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSoilCalibrationOpen(true);
+                    }}
+                  >
+                    <SlidersHorizontal className="h-4 w-4 mr-2" />
+                    Recalibrate soil sensor
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={handleCopyApiKey}>
                   <Key className="h-4 w-4 mr-2" />
                   Copy API Key
@@ -315,6 +337,16 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
           </div>
         </Card>
       </Link>
+
+      <SoilCalibrationModal
+        open={soilCalibrationOpen}
+        onOpenChange={setSoilCalibrationOpen}
+        mode="recalibrate"
+        deviceUuid={device.id}
+        deviceMacId={device.device_id}
+        deviceApiKey={device.apikey}
+        onCalibrationConfirmed={handleRecalibrationConfirmed}
+      />
 
       {/* Rename Device Dialog */}
       <EditDeviceDialog 

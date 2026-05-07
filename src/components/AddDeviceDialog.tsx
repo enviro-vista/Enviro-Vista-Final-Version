@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,7 @@ import { Plus, Loader2, AlertTriangle, CheckCircle2, ScanLine, X } from 'lucide-
 import { useAddDevice, useDevices, useValidateDeviceId } from '@/hooks/useDevices';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { Scanner } from '@yudiel/react-qr-scanner';
+import { SoilCalibrationModal } from '@/components/SoilCalibrationModal';
 
 // Pattern to validate scanned values - accepts MAC addresses and alphanumeric codes
 // MAC formats: XX:XX:XX:XX:XX:XX, XX-XX-XX-XX-XX-XX, XXXXXXXXXXXX
@@ -44,7 +46,14 @@ const AddDeviceDialog = () => {
   const [pendingScan, setPendingScan] = useState<string | null>(null);
   const [scanConfirmCount, setScanConfirmCount] = useState(0);
   const lastScanRef = useRef<string | null>(null);
-  
+  const [soilCalibrationOpen, setSoilCalibrationOpen] = useState(false);
+  const [soilCalibrationDevice, setSoilCalibrationDevice] = useState<{
+    id: string;
+    device_id: string;
+    apikey: string;
+  } | null>(null);
+  const queryClient = useQueryClient();
+
   // Number of consistent scans required before accepting
   const REQUIRED_SCAN_COUNT = 3;
   
@@ -156,27 +165,53 @@ const AddDeviceDialog = () => {
     }
     
     try {
-      await addDevice.mutateAsync({ 
-        device_id: deviceId.trim(), 
-        name: name.trim(), 
+      const result = await addDevice.mutateAsync({
+        device_id: deviceId.trim(),
+        name: name.trim(),
         device_type: deviceType,
-        crop_type: cropType.trim() || null
+        crop_type: cropType.trim() || null,
       });
-      // Mark checklist item as complete
       completeChecklistItem('add-device');
+
+      if (deviceType === 'SOIL' && result.device) {
+        const d = result.device;
+        if (d.apikey) {
+          setSoilCalibrationDevice({
+            id: d.id,
+            device_id: d.device_id,
+            apikey: d.apikey,
+          });
+        }
+        setSoilCalibrationOpen(true);
+        return;
+      }
+
       setDeviceId('');
       setName('');
       setDeviceType('AIR');
       setCropType('');
       setValidationResult(null);
       setOpen(false);
-    } catch (error) {
+    } catch {
       // Error is handled by the mutation
-      // Keep the form open so user can fix the issue
     }
   };
 
+  /** Soil device is already in DB after submit; this only finishes the UX flow. */
+  const handleSoilCalibrationConfirmed = async () => {
+    queryClient.invalidateQueries({ queryKey: ['devices'] });
+    queryClient.invalidateQueries({ queryKey: ['all-devices'] });
+    setSoilCalibrationDevice(null);
+    setDeviceId('');
+    setName('');
+    setDeviceType('AIR');
+    setCropType('');
+    setValidationResult(null);
+    setOpen(false);
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={(isOpen) => {
       if (!isOpen) {
         setValidationResult(null);
@@ -188,6 +223,8 @@ const AddDeviceDialog = () => {
         setIsScanning(false);
         setPendingScan(null);
         setScanConfirmCount(0);
+        setSoilCalibrationOpen(false);
+        setSoilCalibrationDevice(null);
       }
       setOpen(isOpen);
     }}>
@@ -416,6 +453,17 @@ const AddDeviceDialog = () => {
           </form>
       </DialogContent>
     </Dialog>
+
+    <SoilCalibrationModal
+      open={soilCalibrationOpen}
+      onOpenChange={setSoilCalibrationOpen}
+      mode="add"
+      deviceUuid={soilCalibrationDevice?.id ?? null}
+      deviceMacId={soilCalibrationDevice?.device_id ?? null}
+      deviceApiKey={soilCalibrationDevice?.apikey ?? null}
+      onCalibrationConfirmed={handleSoilCalibrationConfirmed}
+    />
+  </>
   );
 };
 
