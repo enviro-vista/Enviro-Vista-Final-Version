@@ -102,12 +102,28 @@ function getDayRangeBounds(timeRange: string, customDateRange?: DateRange): { fr
   return { from: startOfDay(from), to };
 }
 
+type AirChartPoint = {
+  time: string;
+  timeDate: Date;
+  temperature: number;
+  humidity: number;
+  pressure: number;
+  dewPoint: number;
+  batteryVoltage: number;
+  battery: number;
+  heatIndex: number;
+  vpd: number;
+  wetBulbTemp: number;
+  rainProbability: number;
+  gdd: number;
+};
+
 function aggregateReadings(
   readings: Reading[],
   rangeKind: RangeKind,
   timeRange: string,
   customDateRange?: DateRange
-): { time: string; timeDate: Date; temperature: number; humidity: number; pressure: number; dewPoint: number; batteryVoltage: number; battery: number; heatIndex: number; vpd: number; wetBulbTemp: number; rainProbability: number; gdd: number; weatherTrend: string }[] {
+): AirChartPoint[] {
   const valid = (readings ?? []).filter(
     (r) => r != null && (r.timestamp != null || r.created_at != null)
   );
@@ -115,7 +131,20 @@ function aggregateReadings(
 
   const buckets = new Map<
     string,
-    { date: Date; temps: number[]; hums: number[]; pressures: number[]; dews: number[]; batteryVs: number[]; batteries: number[]; heatIndexes: number[]; vpds: number[]; wetBulbs: number[]; rainProbs: number[]; gdds: number[]; weatherTrend: string }
+    {
+      date: Date;
+      temps: number[];
+      hums: number[];
+      pressures: number[];
+      dews: number[];
+      batteryVs: number[];
+      batteries: number[];
+      heatIndexes: number[];
+      vpds: number[];
+      wetBulbTemps: number[];
+      rainProbabilities: number[];
+      gdds: number[];
+    }
   >();
 
   for (const r of valid) {
@@ -125,19 +154,17 @@ function aggregateReadings(
     const key = getBucketKey(date, rangeKind);
     if (!key) continue;
     const existing = buckets.get(key);
-    const airReading = r as Reading & { rain_probability?: number; growing_degree_days?: number };
-    const temp = airReading.temperature ?? 0;
-    const hum = airReading.humidity ?? 0;
-    const press = airReading.pressure ?? 0;
-    const dew = airReading.dew_point ?? 0;
-    const bv = airReading.battery_voltage ?? 0;
-    const bat = airReading.battery_percentage ?? 0;
-    const hi = airReading.heat_index ?? 0;
-    const vpd = airReading.vpd ?? 0;
-    const wetBulb = airReading.wet_bulb_temp ?? 0;
-    const rainProb = airReading.rain_probability ?? 0;
-    const gdd = airReading.growing_degree_days ?? 0;
-    const trend = airReading.weather_trend ?? '';
+    const temp = r.temperature ?? 0;
+    const hum = r.humidity ?? 0;
+    const press = r.pressure ?? 0;
+    const dew = r.dew_point ?? 0;
+    const bv = (r as any).battery_voltage ?? 0;
+    const bat = (r as any).battery_percentage ?? 0;
+    const heat = (r as any).heat_index ?? 0;
+    const vpd = (r as any).vpd ?? 0;
+    const wet = (r as any).wet_bulb_temp ?? 0;
+    const rain = (r as any).rain_probability ?? 0;
+    const gdd = (r as any).growing_degree_days ?? 0;
     if (!existing) {
       buckets.set(key, {
         date,
@@ -147,12 +174,11 @@ function aggregateReadings(
         dews: [dew],
         batteryVs: [bv],
         batteries: [bat],
-        heatIndexes: [hi],
+        heatIndexes: [heat],
         vpds: [vpd],
-        wetBulbs: [wetBulb],
-        rainProbs: [rainProb],
+        wetBulbTemps: [wet],
+        rainProbabilities: [rain],
         gdds: [gdd],
-        weatherTrend: trend,
       });
     } else {
       existing.temps.push(temp);
@@ -161,12 +187,11 @@ function aggregateReadings(
       existing.dews.push(dew);
       existing.batteryVs.push(bv);
       existing.batteries.push(bat);
-      existing.heatIndexes.push(hi);
+      existing.heatIndexes.push(heat);
       existing.vpds.push(vpd);
-      existing.wetBulbs.push(wetBulb);
-      existing.rainProbs.push(rainProb);
+      existing.wetBulbTemps.push(wet);
+      existing.rainProbabilities.push(rain);
       existing.gdds.push(gdd);
-      existing.weatherTrend = trend;
     }
   }
 
@@ -176,7 +201,7 @@ function aggregateReadings(
     return filled.reduce((s, v) => s + v, 0) / filled.length;
   };
 
-  const result = Array.from(buckets.entries()).map(([, b]) => {
+  const result: AirChartPoint[] = Array.from(buckets.entries()).map(([, b]) => {
     const date = b.date;
     return {
       time: formatXLabel(date, rangeKind),
@@ -189,10 +214,9 @@ function aggregateReadings(
       battery: avg(b.batteries),
       heatIndex: avg(b.heatIndexes),
       vpd: avg(b.vpds),
-      wetBulbTemp: avg(b.wetBulbs),
-      rainProbability: avg(b.rainProbs),
+      wetBulbTemp: avg(b.wetBulbTemps),
+      rainProbability: avg(b.rainProbabilities),
       gdd: avg(b.gdds),
-      weatherTrend: b.weatherTrend,
     };
   });
 
@@ -201,14 +225,14 @@ function aggregateReadings(
     const bounds = getDayRangeBounds(timeRange, customDateRange);
     const from = bounds?.from ?? (result.length ? new Date(Math.min(...result.map((r) => r.timeDate.getTime()))) : new Date());
     const to = bounds?.to ?? (result.length ? new Date(Math.max(...result.map((r) => r.timeDate.getTime()))) : new Date());
-    const byDay = new Map<string, (typeof result)[0]>();
+    const byDay = new Map<string, AirChartPoint>();
     result.forEach((row) => {
       const dayKey = startOfDay(row.timeDate).toISOString();
       byDay.set(dayKey, row);
     });
     let d = from.getTime();
     const end = to.getTime();
-    const filled: (typeof result) = [];
+    const filled: AirChartPoint[] = [];
     while (d <= end) {
       const day = new Date(d);
       const dayKey = startOfDay(day).toISOString();
@@ -228,7 +252,6 @@ function aggregateReadings(
           wetBulbTemp: 0,
           rainProbability: 0,
           gdd: 0,
-          weatherTrend: '',
         }
       );
       d = addDays(day, 1).getTime();
@@ -550,6 +573,9 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
                 </div>
                 {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
               </Card>
+            </>
+          ) : (
+            <>
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full temp-gradient"></div>
@@ -606,7 +632,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               </Card>
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-sky-600"></div>
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-400 to-blue-600"></div>
                   Rain Probability (%)
                 </h3>
                 <div className="h-64">
@@ -642,7 +668,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               </Card>
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-orange-500 to-red-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-red-400 to-red-600"></div>
                   Heat Index (°C)
                 </h3>
                 <div className="h-64">
@@ -660,7 +686,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               </Card>
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-cyan-500 to-sky-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600"></div>
                   Wet Bulb Temp (°C)
                 </h3>
                 <div className="h-64">
@@ -678,7 +704,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               </Card>
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-violet-500 to-purple-600"></div>
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-violet-400 to-violet-600"></div>
                   VPD (kPa)
                 </h3>
                 <div className="h-64">
@@ -696,7 +722,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               </Card>
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600"></div>
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-400 to-green-600"></div>
                   GDD
                 </h3>
                 <div className="h-64">
@@ -724,7 +750,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
                       <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                      <Line type="monotone" dataKey="battery" stroke="#22c55e" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="battery" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
