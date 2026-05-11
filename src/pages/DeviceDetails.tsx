@@ -393,7 +393,6 @@ const DeviceDetails = () => {
                             <>
                               <th className="px-4 py-2">CO₂ (ppm)</th>
                               <th className="px-4 py-2">Light (lux)</th>
-                              <th className="px-4 py-2">Soil Moist (%)</th>
                             </>
                           )}
                         </>
@@ -425,7 +424,6 @@ const DeviceDetails = () => {
                               <>
                                 <td className="px-4 py-2">{r.co2 ?? '-'}</td>
                                 <td className="px-4 py-2">{r.light_veml7700 ?? r.light_tsl2591 ?? '-'}</td>
-                                <td className="px-4 py-2">{r.soil_moisture_percentage?.toFixed(1) ?? '-'}</td>
                               </>
                             )}
                           </>
