@@ -107,7 +107,7 @@ function aggregateReadings(
   rangeKind: RangeKind,
   timeRange: string,
   customDateRange?: DateRange
-): { time: string; timeDate: Date; temperature: number; humidity: number; pressure: number; dewPoint: number }[] {
+): { time: string; timeDate: Date; temperature: number; humidity: number; pressure: number; dewPoint: number; batteryVoltage: number; battery: number; heatIndex: number; vpd: number; wetBulbTemp: number; rainProbability: number; gdd: number; weatherTrend: string }[] {
   const valid = (readings ?? []).filter(
     (r) => r != null && (r.timestamp != null || r.created_at != null)
   );
@@ -115,7 +115,7 @@ function aggregateReadings(
 
   const buckets = new Map<
     string,
-    { date: Date; temps: number[]; hums: number[]; pressures: number[]; dews: number[] }
+    { date: Date; temps: number[]; hums: number[]; pressures: number[]; dews: number[]; batteryVs: number[]; batteries: number[]; heatIndexes: number[]; vpds: number[]; wetBulbs: number[]; rainProbs: number[]; gdds: number[]; weatherTrend: string }
   >();
 
   for (const r of valid) {
@@ -125,10 +125,19 @@ function aggregateReadings(
     const key = getBucketKey(date, rangeKind);
     if (!key) continue;
     const existing = buckets.get(key);
-    const temp = r.temperature ?? 0;
-    const hum = r.humidity ?? 0;
-    const press = r.pressure ?? 0;
-    const dew = r.dew_point ?? 0;
+    const airReading = r as Reading & { rain_probability?: number; growing_degree_days?: number };
+    const temp = airReading.temperature ?? 0;
+    const hum = airReading.humidity ?? 0;
+    const press = airReading.pressure ?? 0;
+    const dew = airReading.dew_point ?? 0;
+    const bv = airReading.battery_voltage ?? 0;
+    const bat = airReading.battery_percentage ?? 0;
+    const hi = airReading.heat_index ?? 0;
+    const vpd = airReading.vpd ?? 0;
+    const wetBulb = airReading.wet_bulb_temp ?? 0;
+    const rainProb = airReading.rain_probability ?? 0;
+    const gdd = airReading.growing_degree_days ?? 0;
+    const trend = airReading.weather_trend ?? '';
     if (!existing) {
       buckets.set(key, {
         date,
@@ -136,12 +145,28 @@ function aggregateReadings(
         hums: [hum],
         pressures: [press],
         dews: [dew],
+        batteryVs: [bv],
+        batteries: [bat],
+        heatIndexes: [hi],
+        vpds: [vpd],
+        wetBulbs: [wetBulb],
+        rainProbs: [rainProb],
+        gdds: [gdd],
+        weatherTrend: trend,
       });
     } else {
       existing.temps.push(temp);
       existing.hums.push(hum);
       existing.pressures.push(press);
       existing.dews.push(dew);
+      existing.batteryVs.push(bv);
+      existing.batteries.push(bat);
+      existing.heatIndexes.push(hi);
+      existing.vpds.push(vpd);
+      existing.wetBulbs.push(wetBulb);
+      existing.rainProbs.push(rainProb);
+      existing.gdds.push(gdd);
+      existing.weatherTrend = trend;
     }
   }
 
@@ -160,6 +185,14 @@ function aggregateReadings(
       humidity: avg(b.hums),
       pressure: avg(b.pressures),
       dewPoint: avg(b.dews),
+      batteryVoltage: avg(b.batteryVs),
+      battery: avg(b.batteries),
+      heatIndex: avg(b.heatIndexes),
+      vpd: avg(b.vpds),
+      wetBulbTemp: avg(b.wetBulbs),
+      rainProbability: avg(b.rainProbs),
+      gdd: avg(b.gdds),
+      weatherTrend: b.weatherTrend,
     };
   });
 
@@ -188,6 +221,14 @@ function aggregateReadings(
           humidity: 0,
           pressure: 0,
           dewPoint: 0,
+          batteryVoltage: 0,
+          battery: 0,
+          heatIndex: 0,
+          vpd: 0,
+          wetBulbTemp: 0,
+          rainProbability: 0,
+          gdd: 0,
+          weatherTrend: '',
         }
       );
       d = addDays(day, 1).getTime();
@@ -404,7 +445,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full temp-gradient"></div>
-                  Soil Temperature
+                  Soil Temperature (°C)
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -422,7 +463,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full humidity-gradient"></div>
-                  Soil Moisture
+                  Soil Moisture (%)
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -440,7 +481,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-gradient-to-br from-amber-600 to-amber-800"></div>
-                  Soil Capacitance
+                  Soil Capacitance (pF)
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -458,7 +499,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600"></div>
-                  Battery Voltage
+                  Battery Voltage (V)
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -476,7 +517,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600"></div>
-                  Battery %
+                  Battery (%)
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -494,7 +535,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500"></div>
-                  PAR
+                  PAR (µmol/m²/s)
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -515,7 +556,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full temp-gradient"></div>
-                  Temperature
+                  Temperature (°C)
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -533,7 +574,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full humidity-gradient"></div>
-                  Humidity
+                  Humidity (%)
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -551,7 +592,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full pressure-gradient"></div>
-                  Atmospheric Pressure
+                  Atmospheric Pressure (hPa)
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -569,7 +610,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full dewpoint-gradient"></div>
-                  Dew Point
+                  Dew Point (°C)
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -579,6 +620,132 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
                       <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
                       <Line type="monotone" dataKey="dewPoint" stroke="hsl(var(--dewpoint))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600"></div>
+                  Battery Voltage (V)
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis domain={[2.4, 4.2]} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="batteryVoltage" stroke="#22c55e" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600"></div>
+                  Battery (%)
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="battery" stroke="#22c55e" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-orange-500 to-red-500"></div>
+                  Heat Index (°C)
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="heatIndex" stroke="#ef4444" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-violet-500 to-purple-600"></div>
+                  VPD (kPa)
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="vpd" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-cyan-500 to-sky-500"></div>
+                  Wet Bulb Temp (°C)
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="wetBulbTemp" stroke="#06b6d4" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-sky-600"></div>
+                  Rain Probability (%)
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="rainProbability" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600"></div>
+                  GDD
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="gdd" stroke="#22c55e" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
