@@ -37,7 +37,7 @@ const DeviceDetails = () => {
     if (!readings.length) {
       return isSoil
         ? { soilTemperature: 0, soilCapacitance: 0, soilMoisture: 0, batteryVoltage: 0, battery: 0, par: 0 }
-        : { temperature: 0, humidity: 0, pressure: 0, dewPoint: 0 };
+        : { temperature: 0, humidity: 0, pressure: 0, dewPoint: 0, batteryVoltage: 0, battery: 0 };
     }
     if (isSoil) {
       const withSoilTemp = readings.filter(r => r.soil_temperature != null);
@@ -56,12 +56,16 @@ const DeviceDetails = () => {
       };
     }
     const valid = readings.filter(r => r.temperature != null && r.humidity != null && r.pressure != null && r.dew_point != null);
-    if (!valid.length) return { temperature: 0, humidity: 0, pressure: 0, dewPoint: 0 };
+    const withBatteryV = readings.filter(r => r.battery_voltage != null);
+    const withBattery = readings.filter(r => r.battery_percentage != null);
+    if (!valid.length) return { temperature: 0, humidity: 0, pressure: 0, dewPoint: 0, batteryVoltage: 0, battery: 0 };
     const t = valid.reduce((s, r) => s + (r.temperature || 0), 0) / valid.length;
     const h = valid.reduce((s, r) => s + (r.humidity || 0), 0) / valid.length;
     const p = valid.reduce((s, r) => s + (r.pressure || 0), 0) / valid.length;
     const d = valid.reduce((s, r) => s + (r.dew_point || 0), 0) / valid.length;
-    return { temperature: t, humidity: h, pressure: p, dewPoint: d };
+    const bv = withBatteryV.length ? withBatteryV.reduce((s, r) => s + (r.battery_voltage ?? 0), 0) / withBatteryV.length : 0;
+    const b = withBattery.length ? withBattery.reduce((s, r) => s + (r.battery_percentage ?? 0), 0) / withBattery.length : 0;
+    return { temperature: t, humidity: h, pressure: p, dewPoint: d, batteryVoltage: bv, battery: b };
   }, [readings, isSoil]);
 
   // Export handlers
@@ -217,7 +221,7 @@ const DeviceDetails = () => {
         </div>
 
         {/* Averages - by device type */}
-        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${isSoil ? 'lg:grid-cols-6' : 'lg:grid-cols-4'}`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${isSoil ? 'lg:grid-cols-6' : 'lg:grid-cols-6'}`}>
           {isSoil ? (
             <>
               <Card className="p-4">
@@ -303,6 +307,22 @@ const DeviceDetails = () => {
                   <p className="text-2xl font-semibold">{(averages as { dewPoint: number }).dewPoint.toFixed(1)}°C</p>
                 )}
               </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Battery Voltage</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { batteryVoltage: number }).batteryVoltage.toFixed(2)} V</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Battery</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { battery: number }).battery.toFixed(0)}%</p>
+                )}
+              </Card>
             </>
           )}
         </div>
@@ -367,12 +387,13 @@ const DeviceDetails = () => {
                           <th className="px-4 py-2">Humidity (%)</th>
                           <th className="px-4 py-2">Pressure (hPa)</th>
                           <th className="px-4 py-2">Dew Point (°C)</th>
+                          <th className="px-4 py-2">Battery Voltage (V)</th>
+                          <th className="px-4 py-2">Battery (%)</th>
                           {isPremium && (
                             <>
                               <th className="px-4 py-2">CO₂ (ppm)</th>
                               <th className="px-4 py-2">Light (lux)</th>
                               <th className="px-4 py-2">Soil Moist (%)</th>
-                              <th className="px-4 py-2">Battery (%)</th>
                             </>
                           )}
                         </>
@@ -398,12 +419,13 @@ const DeviceDetails = () => {
                             <td className="px-4 py-2">{r.humidity?.toFixed(1) ?? '-'}</td>
                             <td className="px-4 py-2">{r.pressure?.toFixed(0) ?? '-'}</td>
                             <td className="px-4 py-2">{r.dew_point?.toFixed(1) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.battery_voltage != null ? r.battery_voltage.toFixed(2) : '-'}</td>
+                            <td className="px-4 py-2">{r.battery_percentage?.toFixed(0) ?? '-'}</td>
                             {isPremium && (
                               <>
                                 <td className="px-4 py-2">{r.co2 ?? '-'}</td>
                                 <td className="px-4 py-2">{r.light_veml7700 ?? r.light_tsl2591 ?? '-'}</td>
                                 <td className="px-4 py-2">{r.soil_moisture_percentage?.toFixed(1) ?? '-'}</td>
-                                <td className="px-4 py-2">{r.battery_percentage?.toFixed(0) ?? '-'}</td>
                               </>
                             )}
                           </>
