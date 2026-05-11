@@ -277,7 +277,7 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
  </>
  ) : (
  <>
- {/* Air Device - Show temperature, CO2, humidity, battery voltage, battery % */}
+ {/* Air Device - Show temperature, CO2, humidity, battery voltage, battery %, derived metrics */}
  <div className="flex items-center gap-2">
  <div className="p-1.5 rounded temp-gradient text-white">
  <Thermometer className="h-3 w-3" />
@@ -305,6 +305,36 @@ const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
  <div>
  <p className="text-xs text-muted-foreground">Humidity</p>
  <p className="font-semibold">{device.latest_reading.humidity != null ? device.latest_reading.humidity.toFixed(1) : '-' }%</p>
+ </div>
+ </div>
+
+ <div className="flex items-center gap-2">
+ <div className="p-1.5 rounded bg-gradient-to-br from-orange-400 to-red-500 text-white">
+ <Thermometer className="h-3 w-3" />
+ </div>
+ <div>
+ <p className="text-xs text-muted-foreground">Heat Index</p>
+ <p className="font-semibold">{device.latest_reading.heat_index != null ? device.latest_reading.heat_index.toFixed(1) : '-' }°C</p>
+ </div>
+ </div>
+
+ <div className="flex items-center gap-2">
+ <div className="p-1.5 rounded bg-gradient-to-br from-purple-500 to-indigo-600 text-white">
+ <Gauge className="h-3 w-3" />
+ </div>
+ <div>
+ <p className="text-xs text-muted-foreground">VPD</p>
+ <p className="font-semibold">{device.latest_reading.vpd != null ? device.latest_reading.vpd.toFixed(2) : '-' } kPa</p>
+ </div>
+ </div>
+
+ <div className="flex items-center gap-2">
+ <div className="p-1.5 rounded bg-gradient-to-br from-cyan-500 to-blue-600 text-white">
+ <Thermometer className="h-3 w-3" />
+ </div>
+ <div>
+ <p className="text-xs text-muted-foreground">Wet Bulb</p>
+ <p className="font-semibold">{device.latest_reading.wet_bulb_temp != null ? device.latest_reading.wet_bulb_temp.toFixed(1) : '-' }°C</p>
  </div>
  </div>
 
