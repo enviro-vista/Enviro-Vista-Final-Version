@@ -1,402 +1,532 @@
-import { Link } from "react-router-dom";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
- Thermometer,
- Droplets,
- Gauge,
- Cloud,
- MoreVertical,
- Wifi,
- WifiOff,
- Trash,
- Pencil,
- RefreshCw,
- Key,
- Copy,
- Star,
- Battery,
- Zap,
- Wind,
- Sun,
- SlidersHorizontal,
-} from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import { Device } from "@/hooks/useDevices";
-import {
- DropdownMenu,
- DropdownMenuContent,
- DropdownMenuItem,
- DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { useDeleteDevice, useToggleFavorite } from "@/hooks/useDevices";
-import EditDeviceDialog from "./EditDeviceDialog";
-import { SoilCalibrationModal } from "./SoilCalibrationModal";
+import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
+import { useParams } from 'react-router-dom';
+import { AppLayout } from '@/components/AppLayout';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DateRangeFilter, DateRange } from '@/components/DateRangeFilter';
+import { useSubscriptionStatus } from '@/hooks/useSubscription';
+import { useReadings } from '@/hooks/useReadings';
+import { useAllDevices } from '@/hooks/useDevices';
+import { exportToCSV, exportToJSON, downloadFile, generateFilename } from '@/utils/dataExport';
+import { Download, FileText, BarChart3, Table2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
-interface DeviceCardProps {
- device: Device;
- onDeviceUpdated: () => void;
-}
+const ChartView = lazy(() => import('@/components/ChartView'));
 
-const DeviceCard = ({ device, onDeviceUpdated }: DeviceCardProps) => {
- const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
- const [isRefreshing, setIsRefreshing] = useState(false);
- const [soilCalibrationOpen, setSoilCalibrationOpen] = useState(false);
- const { toast } = useToast();
- const deleteDevice = useDeleteDevice();
- const toggleFavorite = useToggleFavorite();
+const DeviceDetails = () => {
+  const { id } = useParams();
+  const { isPremium } = useSubscriptionStatus();
+  const { data: devices = [] } = useAllDevices();
+  const device = devices.find((d: any) => d.id === id);
 
- const isOnline = device.latest_reading ? (() => {
- const lastReading = new Date(device.latest_reading.timestamp);
- const now = new Date();
- const hoursDiff = (now.getTime() - lastReading.getTime()) / (1000 * 60 * 60);
- return hoursDiff <= 2; // Consider online if last reading was within 2 hours
- })() : false;
+  // Date range state
+  const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
+  const [timePreset, setTimePreset] = useState('24h');
+  const [activeView, setActiveView] = useState<'table' | 'chart'>('table');
 
- const lastReading = device.latest_reading ? new Date(device.latest_reading.timestamp) : null;
+  const { data: readings = [], isLoading, error, isFetching } = useReadings(
+    id,
+    timePreset === 'custom' ? '24h' : timePreset,
+    timePreset === 'custom' ? dateRange : undefined
+  );
 
- const handleDelete = async () => {
- if (window.confirm(`Are you sure you want to delete "${device.name}"? This action cannot be undone.`)) {
- try {
- await deleteDevice.mutateAsync(device.id);
- toast({
- title: "Device Deleted",
- description: `"${device.name}" has been removed from your devices.`,
- });
- } catch (error) {
- toast({
- title: "Error",
- description: "Failed to delete device. Please try again.",
- variant: "destructive",
- });
- }
- }
- };
+  const isSoil = device?.device_type === 'SOIL';
 
- const handleRefresh = async () => {
- setIsRefreshing(true);
- // Simulate API call to refresh device data
- await new Promise(resolve => setTimeout(resolve, 1000));
- setIsRefreshing(false);
- toast({
- title: "Refreshed",
- description: `Device data for "${device.name}" has been refreshed.`,
- });
- };
+  const averages = useMemo(() => {
+    if (!readings.length) {
+      return isSoil
+        ? { soilTemperature: 0, soilCapacitance: 0, soilMoisture: 0, batteryVoltage: 0, battery: 0, par: 0 }
+        : { temperature: 0, humidity: 0, pressure: 0, dewPoint: 0, batteryVoltage: 0, battery: 0, heatIndex: 0, vpd: 0, wetBulbTemp: 0, rainProbability: 0, gdd: 0 };
+    }
+    if (isSoil) {
+      const withSoilTemp = readings.filter(r => r.soil_temperature != null);
+      const withSoilCap = readings.filter(r => r.soil_capacitance != null);
+      const withSoilMoist = readings.filter(r => r.soil_moisture_percentage != null);
+      const withBatteryV = readings.filter(r => r.battery_voltage != null);
+      const withBattery = readings.filter(r => r.battery_percentage != null);
+      const withPar = readings.filter(r => r.par != null);
+      return {
+        soilTemperature: withSoilTemp.length ? withSoilTemp.reduce((s, r) => s + (r.soil_temperature ?? 0), 0) / withSoilTemp.length : 0,
+        soilCapacitance: withSoilCap.length ? withSoilCap.reduce((s, r) => s + (r.soil_capacitance ?? 0), 0) / withSoilCap.length : 0,
+        soilMoisture: withSoilMoist.length ? withSoilMoist.reduce((s, r) => s + (r.soil_moisture_percentage ?? 0), 0) / withSoilMoist.length : 0,
+        batteryVoltage: withBatteryV.length ? withBatteryV.reduce((s, r) => s + (r.battery_voltage ?? 0), 0) / withBatteryV.length : 0,
+        battery: withBattery.length ? withBattery.reduce((s, r) => s + (r.battery_percentage ?? 0), 0) / withBattery.length : 0,
+        par: withPar.length ? withPar.reduce((s, r) => s + (r.par ?? 0), 0) / withPar.length : 0,
+      };
+    }
+    const valid = readings.filter(r => r.temperature != null && r.humidity != null && r.pressure != null && r.dew_point != null);
+    const withBatteryV = readings.filter(r => r.battery_voltage != null);
+    const withBattery = readings.filter(r => r.battery_percentage != null);
+    const withHeatIndex = readings.filter(r => r.heat_index != null);
+    const withVpd = readings.filter(r => r.vpd != null);
+    const withWetBulb = readings.filter(r => r.wet_bulb_temp != null);
+    const withRainProb = readings.filter(r => r.rain_probability != null);
+    const withGdd = readings.filter(r => r.growing_degree_days != null);
+    if (!valid.length) return { temperature: 0, humidity: 0, pressure: 0, dewPoint: 0, batteryVoltage: 0, battery: 0, heatIndex: 0, vpd: 0, wetBulbTemp: 0, rainProbability: 0, gdd: 0 };
+    const t = valid.reduce((s, r) => s + (r.temperature || 0), 0) / valid.length;
+    const h = valid.reduce((s, r) => s + (r.humidity || 0), 0) / valid.length;
+    const p = valid.reduce((s, r) => s + (r.pressure || 0), 0) / valid.length;
+    const d = valid.reduce((s, r) => s + (r.dew_point || 0), 0) / valid.length;
+    const bv = withBatteryV.length ? withBatteryV.reduce((s, r) => s + (r.battery_voltage ?? 0), 0) / withBatteryV.length : 0;
+    const b = withBattery.length ? withBattery.reduce((s, r) => s + (r.battery_percentage ?? 0), 0) / withBattery.length : 0;
+    const hi = withHeatIndex.length ? withHeatIndex.reduce((s, r) => s + (r.heat_index ?? 0), 0) / withHeatIndex.length : 0;
+    const vpd = withVpd.length ? withVpd.reduce((s, r) => s + (r.vpd ?? 0), 0) / withVpd.length : 0;
+    const wbt = withWetBulb.length ? withWetBulb.reduce((s, r) => s + (r.wet_bulb_temp ?? 0), 0) / withWetBulb.length : 0;
+    const rp = withRainProb.length ? withRainProb.reduce((s, r) => s + (r.rain_probability ?? 0), 0) / withRainProb.length : 0;
+    const gdd = withGdd.length ? withGdd.reduce((s, r) => s + (r.growing_degree_days ?? 0), 0) / withGdd.length : 0;
+    return { temperature: t, humidity: h, pressure: p, dewPoint: d, batteryVoltage: bv, battery: b, heatIndex: hi, vpd, wetBulbTemp: wbt, rainProbability: rp, gdd };
+  }, [readings, isSoil]);
 
- const handleCopyApiKey = async () => {
- try {
- await navigator.clipboard.writeText(device.apikey);
- toast({
- title: "API Key Copied",
- description: "Device API key has been copied to clipboard.",
- });
- } catch (error) {
- toast({
- title: "Error",
- description: "Failed to copy API key to clipboard.",
- variant: "destructive",
- });
- }
- };
+  // Export handlers
+  const handleExportCSV = () => {
+    if (readings.length === 0) {
+      toast({
+        title: "No Data",
+        description: "There are no readings to export.",
+        variant: "destructive",
+      });
+      return;
+    }
 
- const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
+    try {
+      const csvContent = exportToCSV(readings, device?.name, device?.device_type);
+      const filename = generateFilename(device?.name || 'device', 'csv', dateRange);
+      downloadFile(csvContent, filename, 'text/csv');
+      toast({
+        title: "Export Successful",
+        description: `Exported ${readings.length} readings to CSV.`,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
- const handleRecalibrationConfirmed = async () => {
- toast({
- title: "Calibration confirmed",
- description: `You confirmed successful recalibration for "${device.name}".`,
- });
- onDeviceUpdated();
- };
+  const handleExportJSON = () => {
+    if (readings.length === 0) {
+      toast({
+        title: "No Data",
+        description: "There are no readings to export.",
+        variant: "destructive",
+      });
+      return;
+    }
 
- return (
- <>
- <Link to={`/devices/${device.id}`} className="block outline-none">
- <Card className="glass-card p-6 group hover:shadow-lg transition-all duration-300 animate-fade-in cursor-pointer h-full">
- <div className="flex items-start justify-between mb-4">
- <div className="space-y-1">
- <h3 className="font-semibold tracking-tight">{device.name}</h3>
- <div className="flex items-center gap-2 flex-wrap">
- <p className="text-sm text-muted-foreground">{device.device_id}</p>
- <Badge variant="secondary" className="text-xs">
- {device.device_type === 'AIR' ? '🌬️ Air' : '🌱 Soil'}
- </Badge>
- {device.crop_type && (
- <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
- 🌾 {device.crop_type}
- </Badge>
- )}
- <Button
- type="button"
- variant="ghost"
- size="sm"
- onClick={(e) => { stopPropagation(e); handleCopyApiKey(); }}
- className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
- title="Copy API Key"
- >
- <Key className="h-3 w-3 mr-1" />
- API Key
- </Button>
- </div>
- </div>
- <div className="flex items-center gap-2" onClick={stopPropagation}>
- <Button
- type="button"
- variant={device.favorite ? 'default' : 'ghost'}
- size="sm"
- className="h-7 px-2"
- onClick={(e) => { stopPropagation(e); toggleFavorite.mutate({ id: device.id, favorite: !device.favorite }); }}
- title={device.favorite ? 'Unfavorite' : 'Mark as favorite'}
- >
- <Star className={`h-4 w-4 ${device.favorite ? '' : 'text-muted-foreground'}`} />
- </Button>
- <Badge className={isOnline ? "bg-green-500/20 text-green-500" : "bg-red-500/20 text-red-500"}>
- {isOnline ? (
- <>
- <Wifi className="h-3 w-3 mr-1" />
- Online
- </>
- ) : (
- <>
- <WifiOff className="h-3 w-3 mr-1" />
- Offline
- </>
- )}
- </Badge>
+    try {
+      const jsonContent = exportToJSON(readings, device?.name, device?.device_type);
+      const filename = generateFilename(device?.name || 'device', 'json', dateRange);
+      downloadFile(jsonContent, filename, 'application/json');
+      toast({
+        title: "Export Successful",
+        description: `Exported ${readings.length} readings to JSON.`,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
- <DropdownMenu>
- <DropdownMenuTrigger asChild>
- <Button type="button" variant="ghost" size="sm" className="focus:outline-none" onClick={stopPropagation}>
- <MoreVertical className="h-4 w-4" />
- </Button>
- </DropdownMenuTrigger>
- <DropdownMenuContent align="end" className="w-48">
- <DropdownMenuItem onClick={() => setIsRenameDialogOpen(true)}>
- <Pencil className="h-4 w-4 mr-2" />
- Rename Device
- </DropdownMenuItem>
- {device.device_type === "SOIL" && (
- <DropdownMenuItem
- onClick={(e) => {
- e.stopPropagation();
- setSoilCalibrationOpen(true);
- }}
- >
- <SlidersHorizontal className="h-4 w-4 mr-2" />
- Recalibrate soil sensor
- </DropdownMenuItem>
- )}
- <DropdownMenuItem onClick={handleCopyApiKey}>
- <Key className="h-4 w-4 mr-2" />
- Copy API Key
- </DropdownMenuItem>
- <DropdownMenuItem onClick={handleRefresh} disabled={isRefreshing}>
- <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
- {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
- </DropdownMenuItem>
- <DropdownMenuItem
- onClick={handleDelete}
- className="text-red-500 focus:bg-red-500/10 focus:text-red-500"
- >
- <Trash className="h-4 w-4 mr-2" />
- Delete Device
- </DropdownMenuItem>
- </DropdownMenuContent>
- </DropdownMenu>
- </div>
- </div>
+  // Only show full loading screen on initial load, not on refetches
+  if (isLoading && !readings.length) {
+    return (
+      <AppLayout title={device?.name || 'Device'} subtitle={device?.device_id} breadcrumbs={[{ title: 'Dashboard', href: '/' }, { title: 'Devices', href: '/devices' }, { title: device?.name || 'Device' }] }>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading readings...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
- {device.latest_reading ? (
- <div className="grid grid-cols-2 gap-4 mb-4">
- {device.device_type === 'SOIL' ? (
- <>
- {/* Soil Device: soil_temperature, soil_capacitance, soil_moisture_percentage, battery_voltage + existing (battery %, PAR) */}
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded temp-gradient text-white">
- <Thermometer className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">Soil Temp</p>
- <p className="font-semibold">{device.latest_reading.soil_temperature != null ? device.latest_reading.soil_temperature.toFixed(1) : '-' }°C</p>
- </div>
- </div>
+  if (error) {
+    return (
+      <AppLayout title={device?.name || 'Device'} subtitle={device?.device_id} breadcrumbs={[{ title: 'Dashboard', href: '/' }, { title: 'Devices', href: '/devices' }, { title: device?.name || 'Device' }] }>
+        <div className="space-y-6">
+          <DateRangeFilter
+            value={dateRange}
+            onChange={setDateRange}
+            onPresetChange={setTimePreset}
+            preset={timePreset}
+          />
+          <Card className="p-6 text-center">
+            <h3 className="text-lg font-semibold text-destructive mb-2">Error Loading Data</h3>
+            <p className="text-muted-foreground mb-4">{error.message}</p>
+            <p className="text-sm text-muted-foreground">
+              Device ID: {id} | Time Range: {timePreset} | Custom Range: {timePreset === 'custom' ? 'Yes' : 'No'}
+            </p>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
 
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded bg-gradient-to-br from-amber-600 to-amber-800 text-white">
- <Battery className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">Soil Capacitance</p>
- <p className="font-semibold">{device.latest_reading.soil_capacitance != null ? device.latest_reading.soil_capacitance.toFixed(1) : '-' }</p>
- </div>
- </div>
+  return (
+    <AppLayout title={device?.name || 'Device'} subtitle={device?.device_id} breadcrumbs={[{ title: 'Dashboard', href: '/' }, { title: 'Devices', href: '/devices' }, { title: device?.name || 'Device' }] }>
+      <div className="space-y-6">
+        {/* Date Range Filter */}
+        <div className="relative">
+          <DateRangeFilter
+            value={dateRange}
+            onChange={setDateRange}
+            onPresetChange={setTimePreset}
+            preset={timePreset}
+          />
+          {isFetching && (
+            <div className="absolute top-2 right-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+            </div>
+          )}
+        </div>
 
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded humidity-gradient text-white">
- <Droplets className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">Soil Moisture</p>
- <p className="font-semibold">{device.latest_reading.soil_moisture_percentage != null ? device.latest_reading.soil_moisture_percentage.toFixed(1) : '-' }%</p>
- </div>
- </div>
+        {/* Action Bar - Export and View Toggle */}
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'table' | 'chart')}>
+              <TabsList>
+                <TabsTrigger value="table">
+                  <Table2 className="h-4 w-4 mr-2" />
+                  Table
+                </TabsTrigger>
+                <TabsTrigger value="chart">
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Charts
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
 
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded bg-gradient-to-br from-green-500 to-emerald-600 text-white">
- <Battery className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">Battery Voltage</p>
- <p className="font-semibold">{device.latest_reading.battery_voltage != null ? device.latest_reading.battery_voltage.toFixed(2) : '-' } V</p>
- </div>
- </div>
+          {readings.length > 0 && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportCSV}
+                disabled={readings.length === 0}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportJSON}
+                disabled={readings.length === 0}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Export JSON
+              </Button>
+            </div>
+          )}
+        </div>
 
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded bg-gradient-to-br from-green-500 to-emerald-600 text-white">
- <Battery className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">Battery</p>
- <p className="font-semibold">{device.latest_reading.battery_percentage != null ? device.latest_reading.battery_percentage.toFixed(0) : '-' }%</p>
- </div>
- </div>
+        {/* Averages - by device type */}
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${isSoil ? 'lg:grid-cols-6' : 'lg:grid-cols-4 xl:grid-cols-6'}`}>
+          {isSoil ? (
+            <>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Soil Temp</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { soilTemperature: number }).soilTemperature.toFixed(1)}°C</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Soil Capacitance</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { soilCapacitance: number }).soilCapacitance.toFixed(1)}</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Soil Moisture</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { soilMoisture: number }).soilMoisture.toFixed(1)}%</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Battery Voltage</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { batteryVoltage: number }).batteryVoltage.toFixed(2)} V</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Battery</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { battery: number }).battery.toFixed(0)}%</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">PAR</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { par: number }).par.toFixed(0)} µmol</p>
+                )}
+              </Card>
+            </>
+          ) : (
+            <>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Temperature</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { temperature: number }).temperature.toFixed(1)}°C</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Humidity</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { humidity: number }).humidity.toFixed(1)}%</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Pressure</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { pressure: number }).pressure.toFixed(0)} hPa</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Dew Point</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { dewPoint: number }).dewPoint.toFixed(1)}°C</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Battery Voltage</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { batteryVoltage: number }).batteryVoltage.toFixed(2)} V</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Battery</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { battery: number }).battery.toFixed(0)}%</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Heat Index</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { heatIndex: number }).heatIndex.toFixed(1)}°C</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">VPD</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { vpd: number }).vpd.toFixed(2)} kPa</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Wet Bulb Temp</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { wetBulbTemp: number }).wetBulbTemp.toFixed(1)}°C</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">Rain Prob.</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { rainProbability: number }).rainProbability.toFixed(0)}%</p>
+                )}
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground">GDD</p>
+                {isFetching && !readings.length ? (
+                  <div className="h-8 bg-muted animate-pulse rounded"></div>
+                ) : (
+                  <p className="text-2xl font-semibold">{(averages as { gdd: number }).gdd.toFixed(1)}</p>
+                )}
+              </Card>
+              {readings.some(r => r.frost_risk) && (
+                <Card className="p-4 border-blue-300 bg-blue-50">
+                  <p className="text-xs text-muted-foreground">Frost Risk</p>
+                  <p className="text-2xl font-semibold text-blue-600">⚠️ Yes</p>
+                </Card>
+              )}
+            </>
+          )}
+        </div>
 
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded bg-gradient-to-br from-yellow-400 to-orange-500 text-white">
- <Sun className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">PAR</p>
- <p className="font-semibold">{device.latest_reading.par != null ? device.latest_reading.par.toFixed(0) : '-' } µmol</p>
- </div>
- </div>
- </>
- ) : (
- <>
- {/* Air Device - Show temperature, CO2, humidity, battery voltage, battery %, derived metrics */}
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded temp-gradient text-white">
- <Thermometer className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">Air Temp</p>
- <p className="font-semibold">{device.latest_reading.temperature != null ? device.latest_reading.temperature.toFixed(1) : '-' }°C</p>
- </div>
- </div>
+        {/* Readings Table or Charts */}
+        {activeView === 'table' ? (
+          <div className={`bg-card rounded-lg border transition-opacity duration-200 ${isFetching ? 'opacity-75' : 'opacity-100'}`}>
+            <div className="p-4 border-b">
+              <h3 className="font-semibold">Readings</h3>
+            </div>
 
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded bg-gradient-to-br from-slate-500 to-slate-700 text-white">
- <Wind className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">CO₂</p>
- <p className="font-semibold">{device.latest_reading.co2 != null ? device.latest_reading.co2.toFixed(0) : '-' } ppm</p>
- </div>
- </div>
-
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded humidity-gradient text-white">
- <Droplets className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">Humidity</p>
- <p className="font-semibold">{device.latest_reading.humidity != null ? device.latest_reading.humidity.toFixed(1) : '-' }%</p>
- </div>
- </div>
-
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded bg-gradient-to-br from-orange-400 to-red-500 text-white">
- <Thermometer className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">Heat Index</p>
- <p className="font-semibold">{device.latest_reading.heat_index != null ? device.latest_reading.heat_index.toFixed(1) : '-' }°C</p>
- </div>
- </div>
-
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded bg-gradient-to-br from-purple-500 to-indigo-600 text-white">
- <Gauge className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">VPD</p>
- <p className="font-semibold">{device.latest_reading.vpd != null ? device.latest_reading.vpd.toFixed(2) : '-' } kPa</p>
- </div>
- </div>
-
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded bg-gradient-to-br from-cyan-500 to-blue-600 text-white">
- <Thermometer className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">Wet Bulb</p>
- <p className="font-semibold">{device.latest_reading.wet_bulb_temp != null ? device.latest_reading.wet_bulb_temp.toFixed(1) : '-' }°C</p>
- </div>
- </div>
-
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded bg-gradient-to-br from-green-500 to-emerald-600 text-white">
- <Battery className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">Battery Voltage</p>
- <p className="font-semibold">{device.latest_reading.battery_voltage != null ? device.latest_reading.battery_voltage.toFixed(2) : '-' } V</p>
- </div>
- </div>
-
- <div className="flex items-center gap-2">
- <div className="p-1.5 rounded bg-gradient-to-br from-green-500 to-emerald-600 text-white">
- <Battery className="h-3 w-3" />
- </div>
- <div>
- <p className="text-xs text-muted-foreground">Battery</p>
- <p className="font-semibold">{device.latest_reading.battery_percentage != null ? device.latest_reading.battery_percentage.toFixed(0) : '-' }%</p>
- </div>
- </div>
- </>
- )}
- </div>
- ) : (
- <div className="mb-4 text-center py-8">
- <p className="text-muted-foreground text-sm">No readings available</p>
- </div>
- )}
-
- <div className="pt-4 border-t border-border/50">
- <p className="text-xs text-muted-foreground">
- {lastReading ? (
- <>Last reading: {formatDistanceToNow(lastReading, { addSuffix: true })}</>
- ) : (
- "No readings yet"
- )}
- </p>
- </div>
- </Card>
- </Link>
-
- <SoilCalibrationModal
- open={soilCalibrationOpen}
- onOpenChange={setSoilCalibrationOpen}
- mode="recalibrate"
- deviceUuid={device.id}
- deviceMacId={device.device_id}
- deviceApiKey={device.apikey}
- onCalibrationConfirmed={handleRecalibrationConfirmed}
- />
-
- {/* Rename Device Dialog */}
- <EditDeviceDialog
- open={isRenameDialogOpen}
- onOpenChange={setIsRenameDialogOpen}
- device={device}
- onDeviceUpdated={onDeviceUpdated}
- />
- </>
- );
+            {isFetching && !readings.length ? (
+              <div className="p-8">
+                <div className="space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex space-x-4">
+                      <div className="h-4 bg-muted animate-pulse rounded flex-1"></div>
+                      <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                      <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                      <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                      <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                      {isPremium && (
+                        <>
+                          <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                          <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                          <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                          <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : readings.length === 0 ? (
+              <div className="p-8 text-center">
+                <h3 className="text-lg font-semibold mb-2">No Data Available</h3>
+                <p className="text-muted-foreground mb-4">
+                  No readings found for the selected time range.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Try selecting a different time range or check if the device is sending data.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="px-4 py-2">Timestamp</th>
+                      {isSoil ? (
+                        <>
+                          <th className="px-4 py-2">Soil Temp (°C)</th>
+                          <th className="px-4 py-2">Soil Capacitance</th>
+                          <th className="px-4 py-2">Soil Moist (%)</th>
+                          <th className="px-4 py-2">Battery Voltage (V)</th>
+                          <th className="px-4 py-2">Battery (%)</th>
+                          <th className="px-4 py-2">PAR (µmol)</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="px-4 py-2">Temp (°C)</th>
+                          <th className="px-4 py-2">Humidity (%)</th>
+                          <th className="px-4 py-2">Pressure (hPa)</th>
+                          <th className="px-4 py-2">Dew Point (°C)</th>
+                          <th className="px-4 py-2">Battery Voltage (V)</th>
+                          <th className="px-4 py-2">Battery (%)</th>
+                          {isPremium && (
+                            <>
+                              <th className="px-4 py-2">Heat Index (°C)</th>
+                              <th className="px-4 py-2">VPD (kPa)</th>
+                              <th className="px-4 py-2">Wet Bulb (°C)</th>
+                              <th className="px-4 py-2">Rain %</th>
+                              <th className="px-4 py-2">GDD</th>
+                              <th className="px-4 py-2">Frost</th>
+                              <th className="px-4 py-2">Weather</th>
+                              <th className="px-4 py-2">CO₂ (ppm)</th>
+                              <th className="px-4 py-2">Light (lux)</th>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {readings.map(r => (
+                      <tr key={r.id} className="border-t">
+                        <td className="px-4 py-2 whitespace-nowrap">{new Date(r.timestamp).toLocaleString()}</td>
+                        {isSoil ? (
+                          <>
+                            <td className="px-4 py-2">{r.soil_temperature?.toFixed(1) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.soil_capacitance != null ? r.soil_capacitance.toFixed(1) : '-'}</td>
+                            <td className="px-4 py-2">{r.soil_moisture_percentage?.toFixed(1) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.battery_voltage != null ? r.battery_voltage.toFixed(2) : '-'}</td>
+                            <td className="px-4 py-2">{r.battery_percentage?.toFixed(0) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.par?.toFixed(0) ?? '-'}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-4 py-2">{r.temperature?.toFixed(1) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.humidity?.toFixed(1) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.pressure?.toFixed(0) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.dew_point?.toFixed(1) ?? '-'}</td>
+                            <td className="px-4 py-2">{r.battery_voltage != null ? r.battery_voltage.toFixed(2) : '-'}</td>
+                            <td className="px-4 py-2">{r.battery_percentage?.toFixed(0) ?? '-'}</td>
+                            {isPremium && (
+                              <>
+                                <td className="px-4 py-2">{r.heat_index?.toFixed(1) ?? '-'}</td>
+                                <td className="px-4 py-2">{r.vpd?.toFixed(2) ?? '-'}</td>
+                                <td className="px-4 py-2">{r.wet_bulb_temp?.toFixed(1) ?? '-'}</td>
+                                <td className="px-4 py-2">{r.rain_probability != null ? r.rain_probability.toFixed(0) : '-'}</td>
+                                <td className="px-4 py-2">{r.growing_degree_days != null ? r.growing_degree_days.toFixed(1) : '-'}</td>
+                                <td className="px-4 py-2">{r.frost_risk ? '⚠️' : '-'}</td>
+                                <td className="px-4 py-2">{r.weather_trend ? r.weather_trend.replace(/_/g, ' ') : '-'}</td>
+                                <td className="px-4 py-2">{r.co2 ?? '-'}</td>
+                                <td className="px-4 py-2">{r.light_veml7700 ?? r.light_tsl2591 ?? '-'}</td>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading charts...</p>
+                </div>
+              </div>
+            }>
+              <ChartView
+                devices={device ? [device] : []}
+                selectedDevice={id || 'all'}
+                timeRange={timePreset === 'custom' ? '24h' : timePreset}
+                customDateRange={timePreset === 'custom' ? dateRange : undefined}
+              />
+            </Suspense>
+          </div>
+        )}
+      </div>
+    </AppLayout>
+  );
 };
 
-export default DeviceCard;
+export default DeviceDetails;
