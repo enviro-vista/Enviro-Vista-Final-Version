@@ -550,9 +550,6 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
                 </div>
                 {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
               </Card>
-            </>
-          ) : (
-            <>
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full temp-gradient"></div>
@@ -609,6 +606,24 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               </Card>
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-sky-600"></div>
+                  Rain Probability (%)
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="rainProbability" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full dewpoint-gradient"></div>
                   Dew Point (°C)
                 </h3>
@@ -620,42 +635,6 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
                       <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
                       <Line type="monotone" dataKey="dewPoint" stroke="hsl(var(--dewpoint))" strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
-              </Card>
-              <Card className="glass-card p-6">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600"></div>
-                  Battery Voltage (V)
-                </h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <YAxis domain={[2.4, 4.2]} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                      <Line type="monotone" dataKey="batteryVoltage" stroke="#22c55e" strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
-              </Card>
-              <Card className="glass-card p-6">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600"></div>
-                  Battery (%)
-                </h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                      <Line type="monotone" dataKey="battery" stroke="#22c55e" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -681,24 +660,6 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               </Card>
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-violet-500 to-purple-600"></div>
-                  VPD (kPa)
-                </h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                      <Line type="monotone" dataKey="vpd" stroke="#8b5cf6" strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
-              </Card>
-              <Card className="glass-card p-6">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-gradient-to-br from-cyan-500 to-sky-500"></div>
                   Wet Bulb Temp (°C)
                 </h3>
@@ -717,17 +678,17 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
               </Card>
               <Card className="glass-card p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-sky-600"></div>
-                  Rain Probability (%)
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-violet-500 to-purple-600"></div>
+                  VPD (kPa)
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                       <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                      <Line type="monotone" dataKey="rainProbability" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="vpd" stroke="#8b5cf6" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -746,6 +707,42 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
                       <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
                       <Line type="monotone" dataKey="gdd" stroke="#22c55e" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600"></div>
+                  Battery (%)
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="battery" stroke="#22c55e" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {xAxisLabel && <p className="text-center text-sm font-medium text-foreground mt-2 pt-2 border-t border-border/50">{xAxisLabel}</p>}
+              </Card>
+              <Card className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600"></div>
+                  Battery Voltage (V)
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis domain={[2.4, 4.2]} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="batteryVoltage" stroke="#22c55e" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
