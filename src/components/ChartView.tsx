@@ -622,7 +622,7 @@ const ChartView = ({ devices, selectedDevice: propSelectedDevice, timeRange: pro
                     <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                       <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis domain={[550, 1100]} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
                       <Line type="monotone" dataKey="pressure" stroke="hsl(var(--pressure))" strokeWidth={2} dot={false} />
                     </LineChart>
